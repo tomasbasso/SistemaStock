@@ -40,7 +40,13 @@
         </div>
     </div>
 
-    <!-- Tabs/Filters could go here, for now just list -->
+    <!-- Filters & Search -->
+    <div class="premium-card p-4 mb-6 flex items-center">
+        <div class="relative flex-1 max-w-md">
+            <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <input type="text" @bind="searchQuery" @bind:event="oninput" placeholder="Buscar movimientos..." class="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+        </div>
+    </div>
 
     @if (isLoading)
     {
@@ -99,6 +105,8 @@
                     </tbody>
                 </table>
             </div>
+
+            <AppPagination TotalItems="totalItems" PageSize="@pageSize" CurrentPage="currentPage" OnPageChanged="HandlePageChange" />
         </div>
     }
 
@@ -130,24 +138,73 @@
     private bool isLoading = true;
     
     // Aggregates
-    private decimal TotalIngresos => items.Where(x => x.Type == TipoMovimiento.Ingreso).Sum(x => x.Amount);
-    private decimal TotalEgresos => items.Where(x => x.Type == TipoMovimiento.Egreso).Sum(x => x.Amount);
+    private decimal TotalIngresos = 0;
+    private decimal TotalEgresos = 0;
     private decimal BalanceTotal => TotalIngresos - TotalEgresos;
+
+    // Search & Pagination
+    private int totalItems = 0;
+    private int currentPage = 1;
+    private int pageSize = 20;
+
+    private string _searchQuery = "";
+    private System.Timers.Timer? searchTimer;
+
+    private string searchQuery 
+    {
+        get => _searchQuery;
+        set 
+        {
+            if (_searchQuery != value)
+            {
+                _searchQuery = value;
+                if (searchTimer != null)
+                {
+                    searchTimer.Stop();
+                    searchTimer.Start();
+                }
+            }
+        }
+    }
 
     private bool isModalOpen = false;
     private MovimientoFinanciero nuevaTransaccion = new();
 
     protected override async Task OnInitializedAsync()
     {
+        searchTimer = new System.Timers.Timer(400);
+        searchTimer.Elapsed += SearchTimer_Elapsed;
+        searchTimer.AutoReset = false;
+
         await LoadData();
+    }
+
+    private void SearchTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        currentPage = 1;
+        InvokeAsync(LoadData);
     }
 
     private async Task LoadData()
     {
         isLoading = true;
-        // Descending date
-        items = (await Data.GetMovimientosAsync()).OrderByDescending(x => x.Date).ToList();
+        StateHasChanged();
+
+        var totales = await Data.GetTotalesMovimientosAsync();
+        TotalIngresos = totales.Ingresos;
+        TotalEgresos = totales.Egresos;
+
+        totalItems = await Data.GetTotalMovimientosAsync(searchQuery);
+        items = await Data.GetMovimientosPaginadosAsync(currentPage, pageSize, searchQuery);
+        
         isLoading = false;
+        StateHasChanged();
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        currentPage = page;
+        await LoadData();
     }
 
     private void OpenNew(TipoMovimiento type)

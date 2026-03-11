@@ -3,6 +3,7 @@
 @using Sistema_de_Stock.Services
 @using Sistema_de_Stock.Components.Shared
 @inject DataService Data
+@inject NotificationService Notifications
 
 <div class="max-w-6xl mx-auto">
     
@@ -67,17 +68,21 @@
 </div>
 
 <!-- Modal -->
-<AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(isEditMode ? "Editar Categoría" : "Nueva Categoría")">
-    <div class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">Nombre de la Categoría</label>
-            <input type="text" @bind="editingItem.Name" @bind:event="oninput" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" placeholder="Ej: Herramientas Manuales" />
+<AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(isEditMode ? "Editar Categória" : "Nueva Categoría")">
+    <EditForm Model="editingItem" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Nombre de la Categoría</label>
+                <InputText @bind-Value="editingItem.Name" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" placeholder="Ej: Herramientas Manuales" />
+                <ValidationMessage For="() => editingItem.Name" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
         </div>
-    </div>
-    <div class="mt-8 flex justify-end gap-3">
-        <button @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
-        <button @onclick="Save" disabled="@string.IsNullOrWhiteSpace(editingItem.Name)" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
-    </div>
+        <div class="mt-8 flex justify-end gap-3">
+            <button type="button" @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium">Guardar</button>
+        </div>
+    </EditForm>
 </AppModal>
 
 <!-- Delete Modal -->
@@ -132,11 +137,18 @@
 
     private async Task Save()
     {
-        if (string.IsNullOrWhiteSpace(editingItem.Name)) return;
-        
-        await Data.SaveCategoriaAsync(editingItem);
-        isModalOpen = false;
-        await LoadData();
+        try
+        {
+            await Data.SaveCategoriaAsync(editingItem);
+            var msg = isEditMode ? "Categoría actualizada." : "Categoría creada.";
+            Notifications.Success(msg);
+            isModalOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al guardar: {ex.Message}");
+        }
     }
 
     private void OpenDelete(Categoria cat)
@@ -149,9 +161,18 @@
     {
         if (deletingItem != null)
         {
-            await Data.DeleteCategoriaAsync(deletingItem.Id);
-            isDeleteModalOpen = false;
-            await LoadData();
+            try
+            {
+                await Data.DeleteCategoriaAsync(deletingItem.Id);
+                Notifications.Success($"Categoría \u2018{deletingItem.Name}\u2019 eliminada.");
+                isDeleteModalOpen = false;
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Notifications.Error($"Error al eliminar: {ex.Message}");
+                isDeleteModalOpen = false;
+            }
         }
     }
 }

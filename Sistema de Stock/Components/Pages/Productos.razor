@@ -3,6 +3,7 @@
 @using Sistema_de_Stock.Services
 @using Sistema_de_Stock.Components.Shared
 @inject DataService Data
+@inject NotificationService Notifications
 
 <div class="max-w-7xl mx-auto">
     
@@ -32,7 +33,7 @@
             <i class="bi bi-arrow-repeat animate-spin text-4xl text-gray-500"></i>
         </div>
     }
-    else if (!FilteredItems.Any() && string.IsNullOrWhiteSpace(searchQuery))
+    else if (!PaginatedItems.Any() && string.IsNullOrWhiteSpace(searchQuery))
     {
         <div class="text-center py-20 bg-white/5 rounded-2xl border border-white/5 border-dashed">
             <i class="bi bi-box-seam text-4xl text-gray-400 mb-4 block"></i>
@@ -105,7 +106,7 @@
                 </table>
             </div>
             
-            <AppPagination TotalItems="FilteredItems.Count" PageSize="20" CurrentPage="currentPage" OnPageChanged="HandlePageChange" />
+            <AppPagination TotalItems="totalItems" PageSize="@pageSize" CurrentPage="currentPage" OnPageChanged="HandlePageChange" />
         </div>
     }
 
@@ -113,55 +114,64 @@
 
 <!-- Form Modal -->
 <AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(isEditMode ? "Editar Producto" : "Nuevo Producto")">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        
-        <div class="md:col-span-2">
-            <label class="block text-sm font-medium text-gray-300 mb-1">Nombre *</label>
-            <input type="text" @bind="editingItem.Name" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+    <EditForm Model="editingItem" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Nombre *</label>
+                <InputText @bind-Value="editingItem.Name" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.Name" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">SKU (Opcional, se autogenera)</label>
+                <InputText @bind-Value="editingItem.SKU" placeholder="Ej: mt150" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Categoría *</label>
+                <InputSelect @bind-Value="editingItem.CategoryId" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]">
+                    <option value="@Guid.Empty" class="bg-[#161b27] text-white">-- Seleccionar --</option>
+                    @foreach (var c in categorias)
+                    {
+                        <option value="@c.Id" class="bg-[#161b27] text-white">@c.Name</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => editingItem.CategoryId" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Precio *</label>
+                <InputNumber @bind-Value="editingItem.Price" step="0.01" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.Price" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Unidad de Medida *</label>
+                <InputText @bind-Value="editingItem.UnidadMedida" placeholder="Ej: u., Kg, Lts, mts" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.UnidadMedida" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Stock Actual</label>
+                <InputNumber @bind-Value="editingItem.Stock" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.Stock" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Stock Mínimo</label>
+                <InputNumber @bind-Value="editingItem.StockMinimo" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.StockMinimo" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
         </div>
 
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">SKU (Opcional, se autogenera)</label>
-            <input type="text" @bind="editingItem.SKU" placeholder="Ej: mt150" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        <div class="mt-8 flex justify-end gap-3">
+            <button type="button" @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium">Guardar</button>
         </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Categoría *</label>
-            <select @bind="editingItem.CategoryId" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]">
-                <option value="@Guid.Empty" class="bg-[#161b27] text-white">-- Seleccionar --</option>
-                @foreach (var c in categorias)
-                {
-                    <option value="@c.Id" class="bg-[#161b27] text-white">@c.Name</option>
-                }
-            </select>
-        </div>
-        
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Precio *</label>
-            <input type="number" step="0.01" @bind="editingItem.Price" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Unidad de Medida *</label>
-            <input type="text" @bind="editingItem.UnidadMedida" placeholder="Ej: u., Kg, Lts, mts" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Stock Actual</label>
-            <input type="number" @bind="editingItem.Stock" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Stock Mínimo</label>
-            <input type="number" @bind="editingItem.StockMinimo" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
-        </div>
-
-    </div>
-    
-    <div class="mt-8 flex justify-end gap-3">
-        <button @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
-        <button @onclick="Save" disabled="@(!IsValid(editingItem))" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
-    </div>
+    </EditForm>
 </AppModal>
 
 <!-- Delete Modal -->
@@ -177,12 +187,15 @@
 </AppModal>
 
 @code {
-    private List<Producto> allItems = new();
+    private List<Producto> PaginatedItems = new();
     private List<Categoria> categorias = new();
     private bool isLoading = true;
+    private int totalItems = 0;
     
     // Search & Pagination
     private string _searchQuery = "";
+    private System.Timers.Timer? searchTimer;
+
     private string searchQuery 
     {
         get => _searchQuery;
@@ -191,23 +204,17 @@
             if (_searchQuery != value)
             {
                 _searchQuery = value;
-                currentPage = 1; // Reset to page 1 on search
+                if (searchTimer != null)
+                {
+                    searchTimer.Stop();
+                    searchTimer.Start();
+                }
             }
         }
     }
     
     private int currentPage = 1;
     private int pageSize = 20;
-
-    private List<Producto> FilteredItems => string.IsNullOrWhiteSpace(searchQuery) 
-        ? allItems 
-        : allItems.Where(x => 
-            x.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || 
-            x.SKU.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
-            GetCategoryName(x.CategoryId).Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
-          ).ToList();
-
-    private IEnumerable<Producto> PaginatedItems => FilteredItems.Skip((currentPage - 1) * pageSize).Take(pageSize);
 
     // Modals
     private bool isModalOpen = false;
@@ -218,15 +225,30 @@
 
     protected override async Task OnInitializedAsync()
     {
+        searchTimer = new System.Timers.Timer(400);
+        searchTimer.Elapsed += SearchTimer_Elapsed;
+        searchTimer.AutoReset = false;
+
+        categorias = await Data.GetCategoriasAsync();
         await LoadData();
+    }
+
+    private void SearchTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        currentPage = 1;
+        InvokeAsync(LoadData);
     }
 
     private async Task LoadData()
     {
         isLoading = true;
-        categorias = await Data.GetCategoriasAsync();
-        allItems = (await Data.GetProductosAsync()).OrderBy(x => x.Name).ToList();
+        StateHasChanged();
+
+        totalItems = await Data.GetTotalProductosAsync(searchQuery);
+        PaginatedItems = await Data.GetProductosPaginadosAsync(currentPage, pageSize, searchQuery);
+        
         isLoading = false;
+        StateHasChanged();
     }
 
     private string GetCategoryName(Guid id)
@@ -235,9 +257,10 @@
         return cat?.Name ?? "Sin Categoría";
     }
 
-    private void HandlePageChange(int page)
+    private async Task HandlePageChange(int page)
     {
         currentPage = page;
+        await LoadData();
     }
 
     private bool IsValid(Producto p)
@@ -271,19 +294,27 @@
 
     private async Task Save()
     {
+        // Auto-generar SKU si está vacío
         if (string.IsNullOrWhiteSpace(editingItem.SKU) && !string.IsNullOrWhiteSpace(editingItem.Name))
         {
-            editingItem.SKU = GenerarSKUAutomatico(editingItem.Name);
+            editingItem.SKU = await GenerarSKUAutomaticoAsync(editingItem.Name);
         }
 
-        if (!IsValid(editingItem)) return;
-        
-        await Data.SaveProductoAsync(editingItem);
-        isModalOpen = false;
-        await LoadData();
+        try
+        {
+            await Data.SaveProductoAsync(editingItem);
+            var msg = isEditMode ? $"'{editingItem.Name}' actualizado." : $"'{editingItem.Name}' agregado al inventario.";
+            Notifications.Success(msg);
+            isModalOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al guardar producto: {ex.Message}");
+        }
     }
 
-    private string GenerarSKUAutomatico(string nombre)
+    private async Task<string> GenerarSKUAutomaticoAsync(string nombre)
     {
         if (string.IsNullOrWhiteSpace(nombre)) return $"P-{new Random().Next(1000, 9999)}";
 
@@ -319,7 +350,7 @@
         string sku = baseSku;
         int counter = 1;
 
-        while (allItems.Any(p => p.SKU.Equals(sku, StringComparison.OrdinalIgnoreCase) && p.Id != editingItem.Id))
+        while (await Data.ExisteProductoPorSKUAsync(sku, editingItem.Id))
         {
             sku = baseSku + "-" + counter;
             counter++;
@@ -338,9 +369,18 @@
     {
         if (deletingItem != null)
         {
-            await Data.DeleteProductoAsync(deletingItem.Id);
-            isDeleteModalOpen = false;
-            await LoadData();
+            try
+            {
+                await Data.DeleteProductoAsync(deletingItem.Id);
+                Notifications.Success($"'{deletingItem.Name}' eliminado del inventario.");
+                isDeleteModalOpen = false;
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Notifications.Error($"Error al eliminar: {ex.Message}");
+                isDeleteModalOpen = false;
+            }
         }
     }
 }

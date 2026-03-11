@@ -87,6 +87,30 @@ namespace Sistema_de_Stock.Services
         public async Task<List<Producto>> GetProductosAsync()
             => await _db.Productos.OrderBy(p => p.Name).ToListAsync();
 
+        public async Task<int> GetTotalProductosAsync(string searchTerm = "")
+        {
+            var query = _db.Productos.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                query = query.Where(p => p.Name.ToLower().Contains(term) || 
+                                         (p.SKU != null && p.SKU.ToLower().Contains(term)));
+            }
+            return await query.CountAsync();
+        }
+
+        public async Task<List<Producto>> GetProductosPaginadosAsync(int page, int pageSize, string searchTerm = "")
+        {
+            var query = _db.Productos.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                query = query.Where(p => p.Name.ToLower().Contains(term) || 
+                                         (p.SKU != null && p.SKU.ToLower().Contains(term)));
+            }
+            return await query.OrderBy(p => p.Name).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        }
+
         public async Task SaveProductoAsync(Producto p)
         {
             var existing = await _db.Productos.FindAsync(p.Id);
@@ -112,6 +136,11 @@ namespace Sistema_de_Stock.Services
                 _db.Productos.Remove(entity);
                 await _db.SaveChangesAsync();
             }
+        }
+
+        public async Task<bool> ExisteProductoPorSKUAsync(string sku, Guid excludeId)
+        {
+            return await _db.Productos.AnyAsync(p => p.SKU == sku && p.Id != excludeId);
         }
 
         // ─────────────────────────────────────────────────────────
@@ -176,6 +205,41 @@ namespace Sistema_de_Stock.Services
 
         public async Task<List<MovimientoFinanciero>> GetMovimientosAsync()
             => await _db.MovimientosFinancieros.OrderByDescending(m => m.Date).ToListAsync();
+
+        public async Task<int> GetTotalMovimientosAsync(string searchTerm = "")
+        {
+            var query = _db.MovimientosFinancieros.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                query = query.Where(m => m.Description != null && m.Description.ToLower().Contains(term));
+            }
+            return await query.CountAsync();
+        }
+
+        public async Task<(decimal Ingresos, decimal Egresos)> GetTotalesMovimientosAsync()
+        {
+            var ingresos = await _db.MovimientosFinancieros
+                .Where(m => m.Type == TipoMovimiento.Ingreso)
+                .SumAsync(m => m.Amount);
+                
+            var egresos = await _db.MovimientosFinancieros
+                .Where(m => m.Type == TipoMovimiento.Egreso)
+                .SumAsync(m => m.Amount);
+                
+            return (ingresos, egresos);
+        }
+
+        public async Task<List<MovimientoFinanciero>> GetMovimientosPaginadosAsync(int page, int pageSize, string searchTerm = "")
+        {
+            var query = _db.MovimientosFinancieros.AsQueryable();
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                query = query.Where(m => m.Description != null && m.Description.ToLower().Contains(term));
+            }
+            return await query.OrderByDescending(m => m.Date).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+        }
 
         public async Task AddMovimientoAsync(MovimientoFinanciero m)
         {

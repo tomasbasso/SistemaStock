@@ -1148,6 +1148,12 @@
   .border-\[var\(--color-success\)\] {
     border-color: var(--color-success);
   }
+  .border-\[var\(--color-success\)\]\/20 {
+    border-color: color-mix(in srgb, oklch(70% 0.18 160) 20%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      border-color: color-mix(in oklab, var(--color-success) 20%, transparent);
+    }
+  }
   .border-\[var\(--color-success\)\]\/30 {
     border-color: color-mix(in srgb, oklch(70% 0.18 160) 30%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1216,6 +1222,12 @@
   }
   .bg-\[var\(--color-success\)\] {
     background-color: var(--color-success);
+  }
+  .bg-\[var\(--color-success\)\]\/10 {
+    background-color: color-mix(in srgb, oklch(70% 0.18 160) 10%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-success) 10%, transparent);
+    }
   }
   .bg-\[var\(--color-success\)\]\/20 {
     background-color: color-mix(in srgb, oklch(70% 0.18 160) 20%, transparent);
@@ -2107,6 +2119,11 @@
   .sm\:flex-1 {
     @media (width >= 40rem) {
       flex: 1;
+    }
+  }
+  .sm\:flex-row {
+    @media (width >= 40rem) {
+      flex-direction: row;
     }
   }
   .sm\:items-center {

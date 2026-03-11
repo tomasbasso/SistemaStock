@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Sistema_de_Stock.Data;
+using CommunityToolkit.Maui;
 
 namespace Sistema_de_Stock
 {
@@ -11,6 +12,7 @@ namespace Sistema_de_Stock
             var builder = MauiApp.CreateBuilder();
             builder
                 .UseMauiApp<App>()
+                .UseMauiCommunityToolkit()
                 .ConfigureFonts(fonts =>
                 {
                     fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
@@ -29,6 +31,7 @@ namespace Sistema_de_Stock
             builder.Services.AddSingleton<Sistema_de_Stock.Services.ReportService>();
             builder.Services.AddSingleton<Sistema_de_Stock.Services.NotificationService>();
             builder.Services.AddSingleton<Sistema_de_Stock.Services.PdfService>();
+            builder.Services.AddSingleton<Sistema_de_Stock.Services.BackupService>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
