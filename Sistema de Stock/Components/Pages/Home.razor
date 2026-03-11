@@ -1,0 +1,232 @@
+﻿@page "/"
+@page "/dashboard"
+@using Sistema_de_Stock.Models
+@using Sistema_de_Stock.Services
+@inject DataService Data
+
+<div class="max-w-7xl mx-auto">
+
+    <!-- Header -->
+    <div class="mb-8">
+        <h2 class="page-title mb-1">Dashboard</h2>
+        <p class="page-subtitle">Resumen general del negocio</p>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            @for(int i = 0; i < 4; i++)
+            {
+                <div class="premium-card p-6 min-h-[140px] animate-pulse"></div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- KPIs Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            
+            <!-- Ventas Hoy -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-primary)]/10 transition-colors">
+                    <i class="bi bi-cart-check text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Ventas Hoy</p>
+                    <h3 class="text-3xl font-bold text-white mb-2">@VentasHoy.ToString("C")</h3>
+                    <p class="text-xs text-green-400 flex items-center gap-1">
+                        <i class="bi bi-graph-up"></i> @CantidadVentasHoy transacciones
+                    </p>
+                </div>
+            </div>
+
+            <!-- Balances CC -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-warning)]/10 transition-colors">
+                    <i class="bi bi-person-lines-fill text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Deuda Clientes (C/C)</p>
+                    <h3 class="text-3xl font-bold text-[var(--color-warning)] mb-2">@TotalDeuda.ToString("C")</h3>
+                    <p class="text-xs text-gray-400">Capital por cobrar</p>
+                </div>
+            </div>
+
+            <!-- Capital en Stock -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-success)]/10 transition-colors">
+                    <i class="bi bi-box-seam text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Valor de Inventario</p>
+                    <h3 class="text-3xl font-bold text-white mb-2">@ValorInventario.ToString("C")</h3>
+                    <p class="text-xs text-gray-400">Total en precio público</p>
+                </div>
+            </div>
+
+            <!-- Productos Registrados -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-primary)]/10 transition-colors">
+                    <i class="bi bi-tags text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Productos Totales</p>
+                    <h3 class="text-3xl font-bold text-white mb-2">@TotalProductos</h3>
+                    <p class="text-xs flex items-center gap-1 @(ProductosBajoStock.Any() ? "text-[var(--color-danger)]" : "text-[var(--color-success)]")">
+                        @if(ProductosBajoStock.Any())
+                        {
+                            <i class="bi bi-exclamation-triangle"></i> <span>@ProductosBajoStock.Count bajo stock</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-circle"></i> <span>Stock saludable</span>
+                        }
+                    </p>
+                </div>
+            </div>
+            
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Alertas de Stock -->
+            <div class="lg:col-span-2 premium-card flex flex-col h-[400px]">
+                <div class="px-6 py-4 border-b border-white/5 flex items-center gap-2">
+                    <i class="bi bi-bell-fill text-[var(--color-warning)]"></i>
+                    <h3 class="font-semibold text-white">Alertas de Stock</h3>
+                </div>
+                <div class="p-0 flex-1 overflow-y-auto">
+                    @if (!ProductosBajoStock.Any())
+                    {
+                        <div class="p-8 text-center text-gray-400 h-full flex flex-col items-center justify-center">
+                            <i class="bi bi-check-circle text-4xl text-[var(--color-success)]/50 mb-3 block"></i>
+                            El stock está en niveles óptimos.
+                        </div>
+                    }
+                    else
+                    {
+                        <table class="w-full text-left whitespace-nowrap">
+                            <thead class="sticky top-0 bg-[var(--color-card)] z-10">
+                                <tr class="bg-white/5 text-xs text-gray-400">
+                                    <th class="px-6 py-3 font-medium">Producto</th>
+                                    <th class="px-6 py-3 font-medium text-right">Stock Actual</th>
+                                    <th class="px-6 py-3 font-medium text-right">Mínimo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach (var p in ProductosBajoStock)
+                                {
+                                    <tr class="hover:bg-white/5 transition-colors">
+                                        <td class="px-6 py-3">
+                                            <div class="font-medium text-white text-sm">@p.Name</div>
+                                            <div class="text-xs text-gray-500 font-mono">@p.SKU</div>
+                                        </td>
+                                        <td class="px-6 py-3 text-right">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--color-danger)]/20 text-[var(--color-danger)] border border-[var(--color-danger)]/30">
+                                                @p.Stock u.
+                                            </span>
+                                        </td>
+                                        <td class="px-6 py-3 text-right text-gray-400 text-sm">
+                                            @p.StockMinimo u.
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+                </div>
+            </div>
+            
+            <!-- Actividad Reciente -->
+            <div class="premium-card flex flex-col h-[400px]">
+                <div class="px-6 py-4 border-b border-white/5 flex items-center gap-2">
+                    <i class="bi bi-clock-history text-gray-400"></i>
+                    <h3 class="font-semibold text-white">Actividad Reciente</h3>
+                </div>
+                <div class="p-6 flex-1 overflow-y-auto">
+                    @if (!UltimosMovimientos.Any())
+                    {
+                        <div class="text-center text-gray-500 py-8">
+                            Sin movimientos registrados hoy.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="space-y-6">
+                            @foreach (var m in UltimosMovimientos.Take(10))
+                            {
+                                <div class="relative pl-6">
+                                    <!-- Timeline line -->
+                                    <div class="absolute left-[11px] top-6 bottom-[-24px] w-px bg-white/10 last:hidden"></div>
+                                    
+                                    <!-- Timeline dot -->
+                                    <div class="absolute left-0 top-1 w-[22px] h-[22px] rounded-full flex items-center justify-center bg-[var(--color-card)] border-2 border-white/10 z-10">
+                                        <div class="w-2 h-2 rounded-full @(m.Type == TipoMovimiento.Ingreso ? "bg-[var(--color-success)]" : "bg-[var(--color-danger)]")"></div>
+                                    </div>
+                                    
+                                    <div>
+                                        <p class="text-sm font-medium text-white">@m.Description</p>
+                                        <div class="flex items-center justify-between mt-1">
+                                            <p class="text-xs text-gray-500">@m.Date.ToString("HH:mm")</p>
+                                            <p class="text-xs font-bold @(m.Type == TipoMovimiento.Ingreso ? "text-[var(--color-success)]" : "text-[var(--color-danger)]")">
+                                                @(m.Type == TipoMovimiento.Ingreso ? "+" : "-")@m.Amount.ToString("C")
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    }
+
+</div>
+
+@code {
+    private bool isLoading = true;
+
+    // Data
+    private decimal VentasHoy = 0;
+    private int CantidadVentasHoy = 0;
+    private decimal TotalDeuda = 0;
+    private decimal ValorInventario = 0;
+    private int TotalProductos = 0;
+    private List<Producto> ProductosBajoStock = new();
+    private List<MovimientoFinanciero> UltimosMovimientos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        
+        await Data.InitializeAsync();
+        DateTime hoyInicio = DateTime.Today;
+        DateTime hoyFin = DateTime.Today.AddDays(1).AddTicks(-1);
+
+        var ventas = await Data.VentaRepo.GetAllAsync();
+        var ventasHoyFiltradas = ventas.Where(x => x.Date >= hoyInicio && x.Date <= hoyFin).ToList();
+        
+        VentasHoy = ventasHoyFiltradas.Sum(x => x.Total);
+        CantidadVentasHoy = ventasHoyFiltradas.Count;
+
+        var cuentas = await Data.CuentaCorrienteRepo.GetAllAsync();
+        TotalDeuda = cuentas.Sum(x => x.Balance);
+
+        var productos = await Data.GetProductosAsync();
+        TotalProductos = productos.Count;
+        ValorInventario = productos.Sum(x => x.Price * Math.Max(0, x.Stock)); // Avoid negative stock affecting total visually
+        ProductosBajoStock = productos.Where(x => x.Stock <= x.StockMinimo).OrderBy(x => x.Stock).ToList();
+
+        var movs = await Data.GetMovimientosAsync();
+        UltimosMovimientos = movs.Where(x => x.Date >= hoyInicio && x.Date <= hoyFin).OrderByDescending(x => x.Date).ToList();
+        
+        isLoading = false;
+    }
+}

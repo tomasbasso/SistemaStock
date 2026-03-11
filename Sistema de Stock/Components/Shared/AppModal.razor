@@ -1,0 +1,41 @@
+<div class="fixed inset-0 z-[100] flex items-center justify-center @(IsOpen ? "visible" : "invisible")">
+    
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 @(IsOpen ? "opacity-100" : "opacity-0")"
+         @onclick="Close"></div>
+    
+    <!-- Dialog Window -->
+    <div class="relative bg-[var(--color-card)] w-full max-w-lg rounded-2xl shadow-2xl border border-white/10 flex flex-col transform transition-all duration-300 @(IsOpen ? "scale-100 opacity-100 translate-y-0" : "scale-95 opacity-0 translate-y-4")"
+         @onclick:stopPropagation>
+        
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-white/5">
+            <h3 class="text-lg font-semibold text-white">@Title</h3>
+            <button @onclick="Close" class="text-gray-400 hover:text-white transition-colors">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        
+        <!-- Body -->
+        <div class="p-6">
+            @ChildContent
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public string Title { get; set; } = "Modal";
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
+
+    public async Task Close()
+    {
+        IsOpen = false;
+        if (IsOpenChanged.HasDelegate)
+        {
+            await IsOpenChanged.InvokeAsync(false);
+        }
+    }
+}

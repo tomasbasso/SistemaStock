@@ -1,0 +1,79 @@
+@inherits LayoutComponentBase
+@using Sistema_de_Stock.Services
+@inject DataService Data
+
+<div class="min-h-screen bg-[var(--color-base)] text-white flex select-none">
+
+    <!-- Fixed Glass Sidebar -->
+    <aside class="w-[260px] fixed inset-y-0 left-0 z-50 glass-panel border-r border-white/5 flex flex-col">
+        
+        <!-- Header / Logo -->
+        <div class="h-20 flex items-center px-6 border-b border-white/5">
+            <div class="w-10 h-10 rounded-xl bg-[var(--color-primary)]/20 flex items-center justify-center mr-3 text-[var(--color-primary)]">
+                <i class="bi bi-box-seam text-xl"></i>
+            </div>
+            <div>
+                <h1 class="font-semibold text-lg tracking-tight">@(nombreNegocio ?? "Cargando...")</h1>
+                <p class="text-xs text-gray-400">Panel de Control</p>
+            </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <div class="flex-1 overflow-y-auto py-6">
+            <NavMenu />
+        </div>
+        
+        <!-- User Profile / Footer (Optional) -->
+        <div class="p-6 border-t border-white/5 flex items-center">
+            <div class="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center mr-3">
+                <i class="bi bi-person-fill text-gray-300"></i>
+            </div>
+            <div>
+                <p class="text-sm font-medium">Administrador</p>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Activo</p>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- Main Content Area (Offset by sidebar width) -->
+    <main class="flex-1 ml-[260px] flex flex-col min-h-screen">
+        
+        <!-- Top Navigation Bar (Optional, for notifications/search) -->
+        <header class="h-20 border-b border-white/5 glass-panel sticky top-0 z-40 px-8 flex items-center justify-between">
+            <div class="text-gray-400">
+                <!-- Can be dynamic based on current page -->
+                <span class="text-sm font-medium">Bienvenido</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <button class="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors flex items-center justify-center text-gray-300">
+                    <i class="bi bi-bell"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Body -->
+        <article class="p-8 flex-1 animate-fade-in relative z-0">
+            @Body
+        </article>
+        
+    </main>
+
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">??</a>
+</div>
+
+@code {
+    private string? nombreNegocio = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Data.InitializeAsync();
+        var configs = await Data.ConfigRepo.GetAllAsync();
+        nombreNegocio = configs.FirstOrDefault()?.NombreNegocio ?? "Sistema de Stock";
+    }
+}

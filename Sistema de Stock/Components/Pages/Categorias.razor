@@ -1,0 +1,157 @@
+@page "/categorias"
+@using Sistema_de_Stock.Models
+@using Sistema_de_Stock.Services
+@using Sistema_de_Stock.Components.Shared
+@inject DataService Data
+
+<div class="max-w-6xl mx-auto">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+            <h2 class="page-title mb-1">Categorías</h2>
+            <p class="page-subtitle">Gestiona las familias de productos</p>
+        </div>
+        <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+            <i class="bi bi-plus-lg"></i>
+            <span>Nueva Categoría</span>
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            @for(int i = 0; i < 3; i++)
+            {
+                <div class="premium-card p-6 min-h-[120px] animate-pulse relative overflow-hidden">
+                    <div class="h-6 w-3/4 bg-white/5 rounded mt-2"></div>
+                </div>
+            }
+        </div>
+    }
+    else if (!items.Any())
+    {
+        <div class="text-center py-20 bg-white/5 rounded-2xl border border-white/5 border-dashed">
+            <i class="bi bi-tags text-4xl text-gray-400 mb-4 block"></i>
+            <h3 class="text-lg font-medium text-white mb-2">No hay categorías registradas</h3>
+            <p class="text-gray-400 mb-6">Crea tu primera categoría para empezar a organizar tu inventario.</p>
+            <button @onclick="OpenNew" class="text-[var(--color-primary)] hover:text-white transition-colors">Crear Categoría &rarr;</button>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            @foreach (var cat in items)
+            {
+                <div class="premium-card p-6 flex flex-col justify-between group hover:-translate-y-1 transition-transform duration-300">
+                    <div>
+                        <div class="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-[var(--color-primary)] mb-4">
+                            <i class="bi bi-tag-fill"></i>
+                        </div>
+                        <h3 class="text-lg font-semibold text-white mb-1">@cat.Name</h3>
+                    </div>
+                    
+                    <div class="flex items-center justify-end gap-2 mt-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button @onclick="() => OpenEdit(cat)" class="w-8 h-8 rounded-md bg-white/5 text-gray-300 hover:text-white hover:bg-[var(--color-primary)] transition-colors flex items-center justify-center">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button @onclick="() => OpenDelete(cat)" class="w-8 h-8 rounded-md bg-white/5 text-gray-300 hover:text-white hover:bg-[var(--color-danger)] transition-colors flex items-center justify-center">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+</div>
+
+<!-- Modal -->
+<AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(isEditMode ? "Editar Categoría" : "Nueva Categoría")">
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Nombre de la Categoría</label>
+            <input type="text" @bind="editingItem.Name" @bind:event="oninput" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" placeholder="Ej: Herramientas Manuales" />
+        </div>
+    </div>
+    <div class="mt-8 flex justify-end gap-3">
+        <button @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button @onclick="Save" disabled="@string.IsNullOrWhiteSpace(editingItem.Name)" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
+    </div>
+</AppModal>
+
+<!-- Delete Modal -->
+<AppModal IsOpen="isDeleteModalOpen" IsOpenChanged="(v) => isDeleteModalOpen = v" Title="Corfirmar Eliminación">
+    <div class="py-4">
+        <p class="text-gray-300">¿Estás seguro de que deseas eliminar la categoría <strong>@deletingItem?.Name</strong>?</p>
+        <p class="text-sm text-[var(--color-danger)] mt-2"><i class="bi bi-exclamation-triangle-fill mr-1"></i> Esta acción no se puede deshacer.</p>
+    </div>
+    <div class="mt-6 flex justify-end gap-3">
+        <button @onclick="() => isDeleteModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button @onclick="ConfirmDelete" class="px-5 py-2.5 rounded-xl bg-[var(--color-danger)] hover:brightness-110 text-white transition-all font-medium">Eliminar</button>
+    </div>
+</AppModal>
+
+@code {
+    private List<Categoria> items = new();
+    private bool isLoading = true;
+    
+    private bool isModalOpen = false;
+    private bool isDeleteModalOpen = false;
+    private bool isEditMode = false;
+    
+    private Categoria editingItem = new();
+    private Categoria? deletingItem;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        items = await Data.GetCategoriasAsync();
+        isLoading = false;
+    }
+
+    private void OpenNew()
+    {
+        editingItem = new Categoria();
+        isEditMode = false;
+        isModalOpen = true;
+    }
+
+    private void OpenEdit(Categoria cat)
+    {
+        // Clone to edit safely
+        editingItem = new Categoria { Id = cat.Id, Name = cat.Name };
+        isEditMode = true;
+        isModalOpen = true;
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(editingItem.Name)) return;
+        
+        await Data.SaveCategoriaAsync(editingItem);
+        isModalOpen = false;
+        await LoadData();
+    }
+
+    private void OpenDelete(Categoria cat)
+    {
+        deletingItem = cat;
+        isDeleteModalOpen = true;
+    }
+
+    private async Task ConfirmDelete()
+    {
+        if (deletingItem != null)
+        {
+            await Data.DeleteCategoriaAsync(deletingItem.Id);
+            isDeleteModalOpen = false;
+            await LoadData();
+        }
+    }
+}

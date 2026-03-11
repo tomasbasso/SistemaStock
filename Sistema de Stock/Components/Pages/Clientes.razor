@@ -1,0 +1,220 @@
+@page "/clientes"
+@using Sistema_de_Stock.Models
+@using Sistema_de_Stock.Services
+@using Sistema_de_Stock.Components.Shared
+@inject DataService Data
+
+<div class="max-w-7xl mx-auto">
+    
+    <!-- Header -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+        <div>
+            <h2 class="page-title mb-1">Clientes</h2>
+            <p class="page-subtitle">Gestión de Clientes y Cuenta Corriente</p>
+        </div>
+        <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+            <i class="bi bi-person-plus-fill"></i>
+            <span>Nuevo Cliente</span>
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="premium-card p-6 min-h-[400px] flex items-center justify-center">
+            <i class="bi bi-arrow-repeat animate-spin text-4xl text-gray-500"></i>
+        </div>
+    }
+    else if (!items.Any())
+    {
+        <div class="text-center py-20 bg-white/5 rounded-2xl border border-white/5 border-dashed">
+            <i class="bi bi-people text-4xl text-gray-400 mb-4 block"></i>
+            <h3 class="text-lg font-medium text-white mb-2">No hay clientes registrados</h3>
+            <p class="text-gray-400 mb-6">Genera tu base de clientes para asociar ventas a cuentas corrientes.</p>
+            <button @onclick="OpenNew" class="text-[var(--color-primary)] hover:text-white transition-colors">Crear Cliente &rarr;</button>
+        </div>
+    }
+    else
+    {
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            @foreach (var item in items)
+            {
+                <div class="premium-card p-6 flex flex-col justify-between group">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-4">
+                            <div class="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-[var(--color-primary)]">
+                                <i class="bi bi-person-fill text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white">@item.Name</h3>
+                                <p class="text-sm text-gray-400">
+                                    <i class="bi bi-telephone mr-1"></i> @(string.IsNullOrEmpty(item.Phone) ? "Sin teléfono" : item.Phone)
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div class="text-right">
+                            @{
+                                var cc = cuentas.FirstOrDefault(x => x.ClienteId == item.Id);
+                                decimal balance = cc?.Balance ?? 0;
+                            }
+                            <p class="text-xs uppercase tracking-widest text-gray-500 mb-1">Balance C/C</p>
+                            <p class="text-lg font-bold @(balance > 0 ? "text-[var(--color-danger)]" : (balance < 0 ? "text-[var(--color-success)]" : "text-gray-300"))">
+                                @balance.ToString("C")
+                            </p>
+                            @if(balance > 0)
+                            {
+                                <p class="text-[10px] text-[var(--color-danger)]/70">Deuda pendiente</p>
+                            }
+                        </div>
+                    </div>
+                    
+                    @if (!string.IsNullOrEmpty(item.Address))
+                    {
+                        <div class="mt-4 text-sm text-gray-400">
+                            <i class="bi bi-geo-alt mr-1"></i> @item.Address
+                        </div>
+                    }
+                    
+                    <div class="flex justify-end mt-4 pt-4 border-t border-white/5 gap-2">
+                        @if(cc != null && cc.Balance > 0)
+                        {
+                            <button @onclick="() => OpenSettleDebt(item, cc)" class="px-4 py-2 rounded-lg bg-[var(--color-success)] hover:brightness-110 text-white text-sm transition-colors flex items-center gap-2">
+                                <i class="bi bi-cash-coin"></i>
+                                Saladar Deuda
+                            </button>
+                        }
+                        <button @onclick="() => OpenEdit(item)" class="w-9 h-9 rounded-lg bg-white/5 text-gray-300 hover:text-white hover:bg-[var(--color-primary)] transition-colors flex items-center justify-center">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+</div>
+
+<!-- Form Modal -->
+<AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(isEditMode ? "Editar Cliente" : "Nuevo Cliente")">
+    <div class="space-y-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Nombre Completo *</label>
+            <input type="text" @bind="editingItem.Name" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Teléfono</label>
+            <input type="text" @bind="editingItem.Phone" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Dirección</label>
+            <input type="text" @bind="editingItem.Address" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        </div>
+    </div>
+    
+    <div class="mt-8 flex justify-end gap-3">
+        <button @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button @onclick="Save" disabled="@string.IsNullOrWhiteSpace(editingItem.Name)" class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">Guardar</button>
+    </div>
+</AppModal>
+
+<!-- Settle Debt Modal -->
+<AppModal IsOpen="isSettleModalOpen" IsOpenChanged="(v) => isSettleModalOpen = v" Title="Saldar Deuda: C/C">
+    <div class="py-2">
+        <p class="text-sm text-gray-300 mb-4">El cliente <strong>@settleClient?.Name</strong> tiene una deuda de <strong class="text-[var(--color-danger)]">@settleCc?.Balance.ToString("C")</strong>.</p>
+        
+        <label class="block text-sm font-medium text-gray-300 mb-1">Monto a abonar</label>
+        <input type="number" step="0.01" max="@(settleCc?.Balance)" @bind="paymentAmount" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-2xl font-bold text-center text-white focus:outline-none focus:border-[var(--color-success)] focus:ring-1 focus:ring-[var(--color-success)]" />
+        
+        <p class="text-xs text-gray-500 mt-2 text-center">Esto generará un Ingreso Financiero y reducirá el balance de la Cuenta Corriente.</p>
+    </div>
+    <div class="mt-6 flex justify-end gap-3">
+        <button @onclick="() => isSettleModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button @onclick="ConfirmPayment" disabled="@(paymentAmount <= 0 || paymentAmount > (settleCc?.Balance ?? 0))" class="px-5 py-2.5 rounded-xl bg-[var(--color-success)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50">Registrar Pago</button>
+    </div>
+</AppModal>
+
+@code {
+    private List<Cliente> items = new();
+    private List<CuentaCorriente> cuentas = new();
+    private bool isLoading = true;
+    
+    private bool isModalOpen = false;
+    private bool isEditMode = false;
+    private Cliente editingItem = new();
+    
+    private bool isSettleModalOpen = false;
+    private Cliente? settleClient;
+    private CuentaCorriente? settleCc;
+    private decimal paymentAmount;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        items = (await Data.GetClientesAsync()).OrderBy(x => x.Name).ToList();
+        cuentas = await Data.CuentaCorrienteRepo.GetAllAsync();
+        isLoading = false;
+    }
+
+    private void OpenNew()
+    {
+        editingItem = new Cliente();
+        isEditMode = false;
+        isModalOpen = true;
+    }
+
+    private void OpenEdit(Cliente item)
+    {
+        editingItem = new Cliente { Id = item.Id, Name = item.Name, Phone = item.Phone, Address = item.Address };
+        isEditMode = true;
+        isModalOpen = true;
+    }
+
+    private async Task Save()
+    {
+        if (string.IsNullOrWhiteSpace(editingItem.Name)) return;
+        
+        await Data.SaveClienteAsync(editingItem);
+        isModalOpen = false;
+        await LoadData();
+    }
+    
+    // Custom CC logic
+    private void OpenSettleDebt(Cliente c, CuentaCorriente cc)
+    {
+        settleClient = c;
+        settleCc = cc;
+        paymentAmount = cc.Balance; // default to full payment
+        isSettleModalOpen = true;
+    }
+    
+    private async Task ConfirmPayment()
+    {
+        if (settleCc != null && settleClient != null && paymentAmount > 0 && paymentAmount <= settleCc.Balance)
+        {
+            // 1. Generate Ingreso
+            await Data.AddMovimientoAsync(new MovimientoFinanciero
+            {
+                Type = TipoMovimiento.Ingreso,
+                Amount = paymentAmount,
+                Description = $"Cobro C/C - {settleClient.Name}"
+            });
+            
+            // 2. Reduce Debt
+            var ccs = await Data.CuentaCorrienteRepo.GetAllAsync();
+            var cc = ccs.FirstOrDefault(x => x.Id == settleCc.Id);
+            if (cc != null)
+            {
+                cc.Balance -= paymentAmount;
+                await Data.CuentaCorrienteRepo.SaveAllAsync(ccs);
+            }
+            
+            isSettleModalOpen = false;
+            await LoadData();
+        }
+    }
+}
