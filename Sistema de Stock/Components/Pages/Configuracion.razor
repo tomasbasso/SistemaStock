@@ -1,7 +1,6 @@
 @page "/configuracion"
-@using Sistema_de_Stock.Models
-@using Sistema_de_Stock.Services
 @inject DataService Data
+@inject NotificationService Notifications
 
 <div class="max-w-3xl">
     <div>
@@ -92,11 +91,7 @@
     private async Task LoadConfig()
     {
         isLoading = true;
-        
-        await Data.InitializeAsync(); // Ensures file exists
-        var all = await Data.ConfigRepo.GetAllAsync();
-        config = all.FirstOrDefault() ?? new ConfiguracionApp();
-        
+        config = await Data.GetConfiguracionAsync() ?? new ConfiguracionApp();
         isLoading = false;
     }
 
@@ -104,22 +99,24 @@
     {
         isSaving = true;
         showSuccessMessage = false;
-        
-        var list = new List<ConfiguracionApp> { config };
-        await Data.ConfigRepo.SaveAllAsync(list);
-        
-        // Simular tiempo de carga por UX
-        await Task.Delay(500);
-        
-        isSaving = false;
-        showSuccessMessage = true;
-        
-        // Hide success message automatically after 3 seconds
-        _ = Task.Run(async () =>
+        try
         {
-            await Task.Delay(3000);
-            showSuccessMessage = false;
-            await InvokeAsync(StateHasChanged);
-        });
+            await Data.SaveConfiguracionAsync(config);
+            await Task.Delay(300);
+            isSaving = false;
+            showSuccessMessage = true;
+            Notifications.Success("Configuración guardada correctamente.");
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                showSuccessMessage = false;
+                await InvokeAsync(StateHasChanged);
+            });
+        }
+        catch (Exception ex)
+        {
+            isSaving = false;
+            Notifications.Error($"Error al guardar: {ex.Message}");
+        }
     }
 }

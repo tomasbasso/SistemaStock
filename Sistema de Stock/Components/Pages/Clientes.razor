@@ -1,8 +1,8 @@
 @page "/clientes"
-@using Sistema_de_Stock.Models
-@using Sistema_de_Stock.Services
-@using Sistema_de_Stock.Components.Shared
 @inject DataService Data
+@inject NotificationService Notifications
+@inject PdfService Pdf
+@using Sistema_de_Stock.Components.Shared
 
 <div class="max-w-7xl mx-auto">
     
@@ -76,6 +76,10 @@
                     }
                     
                     <div class="flex justify-end mt-4 pt-4 border-t border-white/5 gap-2">
+                        <button @onclick="() => OpenDetail(item, cc)" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] hover:brightness-110 text-white text-sm transition-colors flex items-center gap-2">
+                            <i class="bi bi-file-earmark-text"></i>
+                            Ver Detalle
+                        </button>
                         @if(cc != null && cc.Balance > 0)
                         {
                             <button @onclick="() => OpenSettleDebt(item, cc)" class="px-4 py-2 rounded-lg bg-[var(--color-success)] hover:brightness-110 text-white text-sm transition-colors flex items-center gap-2">
@@ -133,6 +137,56 @@
     </div>
 </AppModal>
 
+<!-- Detail Modal -->
+<AppModal IsOpen="isDetailModalOpen" IsOpenChanged="(v) => isDetailModalOpen = v" Title="Detalle de Cuenta Corriente">
+    @if(isLoadingDetails)
+    {
+        <div class="py-10 flex justify-center"><i class="bi bi-arrow-repeat animate-spin text-3xl text-gray-500"></i></div>
+    }
+    else if (detailClient != null)
+    {
+        <div class="space-y-6">
+            <div class="flex flex-col md:flex-row justify-between md:items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+                <div>
+                    <h3 class="font-bold text-white text-lg">@detailClient.Name</h3>
+                    <p class="text-sm text-gray-400">Balance Actual: <span class="font-bold @((detailCc?.Balance ?? 0) > 0 ? "text-[var(--color-danger)]" : "text-[var(--color-success)]")">@((detailCc?.Balance ?? 0).ToString("C"))</span></p>
+                </div>
+                <button @onclick="ExportPdf" class="px-4 py-2 bg-[var(--color-primary)] hover:brightness-110 text-white rounded-lg flex items-center justify-center gap-2 text-sm transition-colors w-full md:w-auto shadow-lg hover:-translate-y-0.5 transform">
+                    <i class="bi bi-file-pdf-fill"></i> Descargar PDF
+                </button>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-semibold text-gray-300 mb-3 border-b border-white/10 pb-2">Historial de Compras en Cuenta Corriente</h4>
+                @if(!detailHistory.Any())
+                {
+                    <p class="text-sm text-gray-500 italic">No hay historial de compras fiadas para este cliente.</p>
+                }
+                else
+                {
+                    <div class="max-h-[300px] overflow-y-auto pr-2 space-y-3">
+                        @foreach(var v in detailHistory)
+                        {
+                            <div class="p-4 bg-black/20 rounded-xl border border-white/5 text-sm">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-gray-400 font-medium">@v.Fecha.ToString("dd/MM/yyyy HH:mm") <span class="text-xs ml-2 py-0.5 px-1.5 bg-white/10 rounded">Venta #@v.NumeroVenta</span></span>
+                                    <span class="font-bold text-white text-lg">@v.Total.ToString("C")</span>
+                                </div>
+                                <ul class="list-none text-gray-400 text-xs space-y-1 mt-3 pt-3 border-t border-white/5">
+                                    @foreach(var item in v.Items)
+                                    {
+                                        <li class="flex items-start gap-2"><i class="bi bi-dot"></i> @item</li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</AppModal>
+
 @code {
     private List<Cliente> items = new();
     private List<CuentaCorriente> cuentas = new();
@@ -147,6 +201,13 @@
     private CuentaCorriente? settleCc;
     private decimal paymentAmount;
 
+    // Detail variables
+    private bool isDetailModalOpen = false;
+    private bool isLoadingDetails = false;
+    private Cliente? detailClient;
+    private CuentaCorriente? detailCc;
+    private List<VentaFiadaDetalle> detailHistory = new();
+
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -155,8 +216,8 @@
     private async Task LoadData()
     {
         isLoading = true;
-        items = (await Data.GetClientesAsync()).OrderBy(x => x.Name).ToList();
-        cuentas = await Data.CuentaCorrienteRepo.GetAllAsync();
+        items = await Data.GetClientesAsync();
+        cuentas = await Data.GetCuentasCorrientesAsync();
         isLoading = false;
     }
 
@@ -196,25 +257,82 @@
     {
         if (settleCc != null && settleClient != null && paymentAmount > 0 && paymentAmount <= settleCc.Balance)
         {
-            // 1. Generate Ingreso
-            await Data.AddMovimientoAsync(new MovimientoFinanciero
+            try
             {
-                Type = TipoMovimiento.Ingreso,
-                Amount = paymentAmount,
-                Description = $"Cobro C/C - {settleClient.Name}"
-            });
+                // 1. Registrar ingreso por cobro
+                await Data.AddMovimientoAsync(new MovimientoFinanciero
+                {
+                    Type = TipoMovimiento.Ingreso,
+                    Amount = paymentAmount,
+                    Description = $"Cobro C/C - {settleClient.Name}"
+                });
+
+                // 2. Reducir deuda en la cuenta corriente
+                var cc = await Data.GetCuentaCorrienteAsync(settleCc.ClienteId);
+                if (cc != null)
+                {
+                    cc.Balance -= paymentAmount;
+                    await Data.SaveCuentaCorrienteAsync(cc);
+                }
+
+                Notifications.Success($"Pago de {paymentAmount:C} registrado para {settleClient.Name}.");
+                isSettleModalOpen = false;
+                await LoadData();
+            }
+            catch (Exception ex)
+            {
+                Notifications.Error($"Error al registrar el pago: {ex.Message}");
+            }
+        }
+    }
+
+    // Detail Logic
+    private async Task OpenDetail(Cliente c, CuentaCorriente? cc)
+    {
+        detailClient = c;
+        detailCc = cc ?? new CuentaCorriente { Balance = 0 };
+        isDetailModalOpen = true;
+        isLoadingDetails = true;
+        
+        detailHistory = await Data.GetVentasFiadasPorClienteAsync(c.Id);
+        isLoadingDetails = false;
+    }
+
+    private async Task ExportPdf()
+    {
+        if (detailClient == null || detailCc == null) return;
+        
+        try
+        {
+            var config = await Data.GetConfiguracionAsync() ?? new ConfiguracionApp { NombreNegocio = "Sistema de Stock" };
+            var data = new EstadoCuentaData
+            {
+                Cliente = detailClient,
+                CuentaCorriente = detailCc,
+                Config = config,
+                VentasFiadas = detailHistory
+            };
             
-            // 2. Reduce Debt
-            var ccs = await Data.CuentaCorrienteRepo.GetAllAsync();
-            var cc = ccs.FirstOrDefault(x => x.Id == settleCc.Id);
-            if (cc != null)
+            var bytes = Pdf.GenerarEstadoCuenta(data);
+            
+            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            string baseName = $"EstadoCuenta_{string.Join("_", detailClient.Name.Split(Path.GetInvalidFileNameChars()))}";
+            string fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+            string path = System.IO.Path.Combine(desktopPath, fileName);
+            
+            int count = 1;
+            while (System.IO.File.Exists(path))
             {
-                cc.Balance -= paymentAmount;
-                await Data.CuentaCorrienteRepo.SaveAllAsync(ccs);
+                fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmm}({count++}).pdf";
+                path = System.IO.Path.Combine(desktopPath, fileName);
             }
             
-            isSettleModalOpen = false;
-            await LoadData();
+            await System.IO.File.WriteAllBytesAsync(path, bytes);
+            Notifications.Success($"PDF guardado en el Escritorio con éxito.");
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al exportar PDF: {ex.Message}");
         }
     }
 }

@@ -1,5 +1,6 @@
 @inherits LayoutComponentBase
 @using Sistema_de_Stock.Services
+@using Sistema_de_Stock.Components.Shared
 @inject DataService Data
 
 <div class="min-h-screen bg-[var(--color-base)] text-white flex select-none">
@@ -61,6 +62,8 @@
 
 </div>
 
+<ToastContainer />
+
 <div id="blazor-error-ui">
     An unhandled error has occurred.
     <a href="" class="reload">Reload</a>
@@ -72,8 +75,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        await Data.InitializeAsync();
-        var configs = await Data.ConfigRepo.GetAllAsync();
-        nombreNegocio = configs.FirstOrDefault()?.NombreNegocio ?? "Sistema de Stock";
+        var config = await Data.GetConfiguracionAsync();
+        nombreNegocio = config?.NombreNegocio ?? "Sistema de Stock";
     }
 }

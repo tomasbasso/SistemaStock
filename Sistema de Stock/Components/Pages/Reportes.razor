@@ -1,7 +1,4 @@
 @page "/reportes"
-@using Sistema_de_Stock.Models
-@using Sistema_de_Stock.Services
-@using Sistema_de_Stock.Components.Shared
 @inject DataService Data
 @inject ReportService Reports
 
@@ -113,10 +110,8 @@
     private string successMessage = "";
     private string errorMessage = "";
 
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        // Just checking if data service is ready
-        await Data.InitializeAsync();
         isLoading = false;
     }
 
@@ -197,7 +192,7 @@
         {
             await Task.Delay(500);
             
-            var ventas = (await Data.VentaRepo.GetAllAsync()).ToList();
+            var ventas = await Data.GetVentasAsync();
             var clientes = await Data.GetClientesAsync();
             
             var bytes = Reports.GenerateSalesReport(ventas, clientes);

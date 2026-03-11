@@ -73,7 +73,7 @@
                                                           "bg-[var(--color-success)]/20 text-[var(--color-success)] border-[var(--color-success)]/30");
                                     }
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border @badgeClass">
-                                        @item.Stock u.
+                                        @item.Stock @item.UnidadMedida
                                     </span>
                                     @if(item.StockMinimo > 0)
                                     {
@@ -121,8 +121,8 @@
         </div>
 
         <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">SKU</label>
-            <input type="text" @bind="editingItem.SKU" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+            <label class="block text-sm font-medium text-gray-300 mb-1">SKU (Opcional, se autogenera)</label>
+            <input type="text" @bind="editingItem.SKU" placeholder="Ej: mt150" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
         </div>
 
         <div>
@@ -141,7 +141,10 @@
             <input type="number" step="0.01" @bind="editingItem.Price" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
         </div>
 
-        <div></div>
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Unidad de Medida *</label>
+            <input type="text" @bind="editingItem.UnidadMedida" placeholder="Ej: u., Kg, Lts, mts" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        </div>
 
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-1">Stock Actual</label>
@@ -259,7 +262,8 @@
             CategoryId = item.CategoryId, 
             Price = item.Price, 
             Stock = item.Stock, 
-            StockMinimo = item.StockMinimo 
+            StockMinimo = item.StockMinimo,
+            UnidadMedida = item.UnidadMedida
         };
         isEditMode = true;
         isModalOpen = true;
@@ -267,11 +271,61 @@
 
     private async Task Save()
     {
+        if (string.IsNullOrWhiteSpace(editingItem.SKU) && !string.IsNullOrWhiteSpace(editingItem.Name))
+        {
+            editingItem.SKU = GenerarSKUAutomatico(editingItem.Name);
+        }
+
         if (!IsValid(editingItem)) return;
         
         await Data.SaveProductoAsync(editingItem);
         isModalOpen = false;
         await LoadData();
+    }
+
+    private string GenerarSKUAutomatico(string nombre)
+    {
+        if (string.IsNullOrWhiteSpace(nombre)) return $"P-{new Random().Next(1000, 9999)}";
+
+        var letters = new string(nombre.Where(char.IsLetter).ToArray()).ToLowerInvariant();
+        var numbers = new string(nombre.Where(char.IsDigit).ToArray());
+
+        string prefix = "";
+        if (letters.Length >= 2)
+        {
+            prefix += letters[0];
+            var consonantes = "bcdfghjklmnpqrstvwxyz"; // Buscamos una consonante para acompañar
+            var nextConsonant = letters.Substring(1).FirstOrDefault(c => consonantes.Contains(c));
+            if (nextConsonant != default(char))
+                prefix += nextConsonant;
+            else
+                prefix += letters[1];
+        }
+        else if (letters.Length == 1)
+        {
+            prefix = letters;
+        }
+        else
+        {
+            prefix = "prd";
+        }
+
+        if (string.IsNullOrEmpty(numbers))
+        {
+            numbers = new Random().Next(100, 999).ToString();
+        }
+
+        string baseSku = prefix + numbers;
+        string sku = baseSku;
+        int counter = 1;
+
+        while (allItems.Any(p => p.SKU.Equals(sku, StringComparison.OrdinalIgnoreCase) && p.Id != editingItem.Id))
+        {
+            sku = baseSku + "-" + counter;
+            counter++;
+        }
+
+        return sku;
     }
 
     private void OpenDelete(Producto item)

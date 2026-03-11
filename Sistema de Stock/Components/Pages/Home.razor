@@ -1,7 +1,5 @@
 ﻿@page "/"
 @page "/dashboard"
-@using Sistema_de_Stock.Models
-@using Sistema_de_Stock.Services
 @inject DataService Data
 
 <div class="max-w-7xl mx-auto">
@@ -206,22 +204,21 @@
     {
         isLoading = true;
         
-        await Data.InitializeAsync();
         DateTime hoyInicio = DateTime.Today;
         DateTime hoyFin = DateTime.Today.AddDays(1).AddTicks(-1);
 
-        var ventas = await Data.VentaRepo.GetAllAsync();
+        var ventas = await Data.GetVentasAsync();
         var ventasHoyFiltradas = ventas.Where(x => x.Date >= hoyInicio && x.Date <= hoyFin).ToList();
         
         VentasHoy = ventasHoyFiltradas.Sum(x => x.Total);
         CantidadVentasHoy = ventasHoyFiltradas.Count;
 
-        var cuentas = await Data.CuentaCorrienteRepo.GetAllAsync();
+        var cuentas = await Data.GetCuentasCorrientesAsync();
         TotalDeuda = cuentas.Sum(x => x.Balance);
 
         var productos = await Data.GetProductosAsync();
         TotalProductos = productos.Count;
-        ValorInventario = productos.Sum(x => x.Price * Math.Max(0, x.Stock)); // Avoid negative stock affecting total visually
+        ValorInventario = productos.Sum(x => x.Price * Math.Max(0, x.Stock));
         ProductosBajoStock = productos.Where(x => x.Stock <= x.StockMinimo).OrderBy(x => x.Stock).ToList();
 
         var movs = await Data.GetMovimientosAsync();

@@ -1,101 +1,98 @@
+using Microsoft.EntityFrameworkCore;
+using Sistema_de_Stock.Data;
 using Sistema_de_Stock.Models;
 
 namespace Sistema_de_Stock.Services
 {
+    /// <summary>
+    /// Servicio principal de acceso a datos, ahora basado en EF Core / SQLite.
+    /// Mantiene el mismo contrato público que antes para compatibilidad con los componentes Blazor.
+    /// </summary>
     public class DataService
     {
-        public JsonRepository<ConfiguracionApp> ConfigRepo { get; } = new("config.json");
-        public JsonRepository<Categoria> CategoriaRepo { get; } = new("categorias.json");
-        public JsonRepository<Producto> ProductoRepo { get; } = new("productos.json");
-        public JsonRepository<Cliente> ClienteRepo { get; } = new("clientes.json");
-        public JsonRepository<CuentaCorriente> CuentaCorrienteRepo { get; } = new("cuentas_corrientes.json");
-        public JsonRepository<MovimientoFinanciero> MovimientoRepo { get; } = new("movimientos.json");
-        public JsonRepository<Venta> VentaRepo { get; } = new("ventas.json");
-        public JsonRepository<VentaDetalle> VentaDetalleRepo { get; } = new("ventas_detalles.json");
+        private readonly StockDbContext _db;
 
+        public DataService(StockDbContext db)
+        {
+            _db = db;
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // INICIALIZACIÓN
+        // ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Inicializa la base de datos y aplica migraciones pendientes.
+        /// Se llama desde MauiProgram o App.xaml.cs al iniciar.
+        /// </summary>
         public async Task InitializeAsync()
         {
-            var conf = await ConfigRepo.GetAllAsync();
-            if (!conf.Any())
-            {
-                await ConfigRepo.SaveAllAsync(new List<ConfiguracionApp> 
-                { 
-                    new ConfiguracionApp 
-                    { 
-                        NombreNegocio = "Mi Negocio Stock"
-                    } 
-                });
-            }
-
-            await SeedMockDataAsync();
+            await _db.InitializeDatabaseAsync();
         }
 
-        private async Task SeedMockDataAsync()
+        // ─────────────────────────────────────────────────────────
+        // CONFIGURACIÓN
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<ConfiguracionApp?> GetConfiguracionAsync()
+            => await _db.Configuraciones.FirstOrDefaultAsync();
+
+        public async Task SaveConfiguracionAsync(ConfiguracionApp config)
         {
-            var categorias = await CategoriaRepo.GetAllAsync();
-            if (categorias.Any()) return; // Already seeded
-
-            // --- Categorias ---
-            var catHerramientas = new Categoria { Name = "Herramientas Manuales" };
-            var catElectricas = new Categoria { Name = "Herramientas Eléctricas" };
-            var catConstruccion = new Categoria { Name = "Materiales de Construcción" };
-            
-            await CategoriaRepo.SaveAllAsync(new List<Categoria> { catHerramientas, catElectricas, catConstruccion });
-
-            // --- Productos ---
-            var prod1 = new Producto { Name = "Martillo Carpintero 600g", SKU = "HT-001", Price = 8500.00m, Stock = 50, StockMinimo = 10, CategoryId = catHerramientas.Id };
-            var prod2 = new Producto { Name = "Destornillador Phillips Pz2", SKU = "HT-002", Price = 3200.00m, Stock = 120, StockMinimo = 20, CategoryId = catHerramientas.Id };
-            var prod3 = new Producto { Name = "Taladro Percutor 700W Bosch", SKU = "EL-001", Price = 125000.00m, Stock = 15, StockMinimo = 5, CategoryId = catElectricas.Id };
-            var prod4 = new Producto { Name = "Amoladora Angular 115mm", SKU = "EL-002", Price = 89000.00m, Stock = 8, StockMinimo = 10, CategoryId = catElectricas.Id }; // Low stock
-            var prod5 = new Producto { Name = "Bolsa Cemento Loma Negra 50kg", SKU = "MT-001", Price = 9800.00m, Stock = 200, StockMinimo = 50, CategoryId = catConstruccion.Id };
-            var prod6 = new Producto { Name = "Arena Fina x Metro", SKU = "MT-002", Price = 15000.00m, Stock = 0, StockMinimo = 10, CategoryId = catConstruccion.Id }; // Out of stock
-            
-            await ProductoRepo.SaveAllAsync(new List<Producto> { prod1, prod2, prod3, prod4, prod5, prod6 });
-
-            // --- Clientes ---
-            var cli1 = new Cliente { Name = "Juan Pérez", Phone = "11-4567-8910", Address = "Av. Siempre Viva 123" };
-            var cli2 = new Cliente { Name = "Constructora El Sol S.A.", Phone = "11-9876-5432", Address = "Calle Comercial 456" };
-
-            await ClienteRepo.SaveAllAsync(new List<Cliente> { cli1, cli2 });
-
-            // --- Cuentas Corrientes ---
-            var cc1 = new CuentaCorriente { ClienteId = cli1.Id, Balance = 0 };
-            var cc2 = new CuentaCorriente { ClienteId = cli2.Id, Balance = 45500.00m }; // Has debt
-
-            await CuentaCorrienteRepo.SaveAllAsync(new List<CuentaCorriente> { cc1, cc2 });
-            
-            // --- Movimientos (Initial state) ---
-            var mov1 = new MovimientoFinanciero { Type = TipoMovimiento.Ingreso, Amount = 150000, Description = "Capital Inicial" };
-            
-            // Set to today so it appears in Dashboard
-            mov1.Date = DateTime.Today.AddHours(9);
-
-            await MovimientoRepo.SaveAllAsync(new List<MovimientoFinanciero> { mov1 });
+            var existing = await _db.Configuraciones.FindAsync(config.Id);
+            if (existing == null)
+                _db.Configuraciones.Add(config);
+            else
+            {
+                existing.NombreNegocio = config.NombreNegocio;
+                existing.Moneda = config.Moneda;
+                existing.DireccionNegocio = config.DireccionNegocio;
+                existing.Telefono = config.Telefono;
+            }
+            await _db.SaveChangesAsync();
         }
 
-        // --- Categories ---
-        public async Task<List<Categoria>> GetCategoriasAsync() => await CategoriaRepo.GetAllAsync();
+        // ─────────────────────────────────────────────────────────
+        // CATEGORÍAS
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<List<Categoria>> GetCategoriasAsync()
+            => await _db.Categorias.OrderBy(c => c.Name).ToListAsync();
+
         public async Task SaveCategoriaAsync(Categoria c)
         {
-            var list = await GetCategoriasAsync();
-            var existing = list.FirstOrDefault(x => x.Id == c.Id);
-            if (existing != null) { existing.Name = c.Name; } else { list.Add(c); }
-            await CategoriaRepo.SaveAllAsync(list);
-        }
-        public async Task DeleteCategoriaAsync(Guid id)
-        {
-            var list = await GetCategoriasAsync();
-            list.RemoveAll(x => x.Id == id);
-            await CategoriaRepo.SaveAllAsync(list);
+            var existing = await _db.Categorias.FindAsync(c.Id);
+            if (existing == null)
+                _db.Categorias.Add(c);
+            else
+                existing.Name = c.Name;
+
+            await _db.SaveChangesAsync();
         }
 
-        // --- Products ---
-        public async Task<List<Producto>> GetProductosAsync() => await ProductoRepo.GetAllAsync();
+        public async Task DeleteCategoriaAsync(Guid id)
+        {
+            var entity = await _db.Categorias.FindAsync(id);
+            if (entity != null)
+            {
+                _db.Categorias.Remove(entity);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // PRODUCTOS
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<List<Producto>> GetProductosAsync()
+            => await _db.Productos.OrderBy(p => p.Name).ToListAsync();
+
         public async Task SaveProductoAsync(Producto p)
         {
-            var list = await GetProductosAsync();
-            var existing = list.FirstOrDefault(x => x.Id == p.Id);
-            if (existing != null)
+            var existing = await _db.Productos.FindAsync(p.Id);
+            if (existing == null)
+                _db.Productos.Add(p);
+            else
             {
                 existing.Name = p.Name;
                 existing.SKU = p.SKU;
@@ -104,122 +101,209 @@ namespace Sistema_de_Stock.Services
                 existing.StockMinimo = p.StockMinimo;
                 existing.Price = p.Price;
             }
-            else { list.Add(p); }
-            await ProductoRepo.SaveAllAsync(list);
-        }
-        public async Task DeleteProductoAsync(Guid id)
-        {
-            var list = await GetProductosAsync();
-            list.RemoveAll(x => x.Id == id);
-            await ProductoRepo.SaveAllAsync(list);
+            await _db.SaveChangesAsync();
         }
 
-        // --- Clients & CC ---
-        public async Task<List<Cliente>> GetClientesAsync() => await ClienteRepo.GetAllAsync();
+        public async Task DeleteProductoAsync(Guid id)
+        {
+            var entity = await _db.Productos.FindAsync(id);
+            if (entity != null)
+            {
+                _db.Productos.Remove(entity);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // CLIENTES & CUENTAS CORRIENTES
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<List<Cliente>> GetClientesAsync()
+            => await _db.Clientes.OrderBy(c => c.Name).ToListAsync();
+
         public async Task SaveClienteAsync(Cliente c)
         {
-            var list = await GetClientesAsync();
-            var existing = list.FirstOrDefault(x => x.Id == c.Id);
-            if (existing != null)
+            var existing = await _db.Clientes.FindAsync(c.Id);
+            if (existing == null)
+            {
+                _db.Clientes.Add(c);
+                // Crear cuenta corriente automáticamente al crear un cliente nuevo
+                _db.CuentasCorrientes.Add(new CuentaCorriente { ClienteId = c.Id });
+            }
+            else
             {
                 existing.Name = c.Name;
                 existing.Phone = c.Phone;
                 existing.Address = c.Address;
             }
-            else 
-            { 
-                list.Add(c); 
-                // Create CC automatically
-                var ccList = await CuentaCorrienteRepo.GetAllAsync();
-                ccList.Add(new CuentaCorriente { ClienteId = c.Id });
-                await CuentaCorrienteRepo.SaveAllAsync(ccList);
-            }
-            await ClienteRepo.SaveAllAsync(list);
-        }
-        
-        public async Task<CuentaCorriente?> GetCuentaCorrienteAsync(Guid clienteId)
-        {
-            var list = await CuentaCorrienteRepo.GetAllAsync();
-            return list.FirstOrDefault(x => x.ClienteId == clienteId);
+            await _db.SaveChangesAsync();
         }
 
-        // --- Finances ---
-        public async Task<List<MovimientoFinanciero>> GetMovimientosAsync() => await MovimientoRepo.GetAllAsync();
+        public async Task DeleteClienteAsync(Guid id)
+        {
+            var entity = await _db.Clientes.FindAsync(id);
+            if (entity != null)
+            {
+                // Eliminar cuenta corriente asociada
+                var cc = await _db.CuentasCorrientes.FirstOrDefaultAsync(x => x.ClienteId == id);
+                if (cc != null) _db.CuentasCorrientes.Remove(cc);
+
+                _db.Clientes.Remove(entity);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        public async Task<CuentaCorriente?> GetCuentaCorrienteAsync(Guid clienteId)
+            => await _db.CuentasCorrientes.FirstOrDefaultAsync(x => x.ClienteId == clienteId);
+
+        public async Task<List<CuentaCorriente>> GetCuentasCorrientesAsync()
+            => await _db.CuentasCorrientes.ToListAsync();
+
+        public async Task SaveCuentaCorrienteAsync(CuentaCorriente cc)
+        {
+            var existing = await _db.CuentasCorrientes.FindAsync(cc.Id);
+            if (existing == null)
+                _db.CuentasCorrientes.Add(cc);
+            else
+                existing.Balance = cc.Balance;
+
+            await _db.SaveChangesAsync();
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // MOVIMIENTOS FINANCIEROS
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<List<MovimientoFinanciero>> GetMovimientosAsync()
+            => await _db.MovimientosFinancieros.OrderByDescending(m => m.Date).ToListAsync();
+
         public async Task AddMovimientoAsync(MovimientoFinanciero m)
         {
-            var list = await GetMovimientosAsync();
-            list.Add(m);
-            await MovimientoRepo.SaveAllAsync(list);
+            _db.MovimientosFinancieros.Add(m);
+            await _db.SaveChangesAsync();
         }
 
-        // --- POS / Ventas ---
+        public async Task DeleteMovimientoAsync(Guid id)
+        {
+            var entity = await _db.MovimientosFinancieros.FindAsync(id);
+            if (entity != null)
+            {
+                _db.MovimientosFinancieros.Remove(entity);
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        // ─────────────────────────────────────────────────────────
+        // VENTAS
+        // ─────────────────────────────────────────────────────────
+
+        public async Task<List<Venta>> GetVentasAsync()
+            => await _db.Ventas.OrderByDescending(v => v.Date).ToListAsync();
+
+        public async Task<List<VentaDetalle>> GetVentaDetallesAsync(Guid ventaId)
+            => await _db.VentaDetalles.Where(d => d.VentaId == ventaId).ToListAsync();
+
+        /// <summary>
+        /// Obtiene el historial de ventas en cuenta corriente de un cliente (sólo fiado) 
+        /// junto con sus detalles proyectados a texto para armar el PDF.
+        /// </summary>
+        public async Task<List<VentaFiadaDetalle>> GetVentasFiadasPorClienteAsync(Guid clienteId)
+        {
+            var ventas = await _db.Ventas
+                .Where(v => v.ClienteId == clienteId && v.IsFiado)
+                .OrderByDescending(v => v.Date)
+                .ToListAsync();
+
+            var r = new List<VentaFiadaDetalle>();
+            foreach (var v in ventas)
+            {
+                var detalles = await _db.VentaDetalles
+                    .Where(d => d.VentaId == v.Id)
+                    .Join(_db.Productos, d => d.ProductoId, p => p.Id, (d, p) => $"{d.Quantity}x {p.Name} ({d.UnitPrice:C})")
+                    .ToListAsync();
+
+                r.Add(new VentaFiadaDetalle
+                {
+                    NumeroVenta = v.NumeroVenta,
+                    Fecha = v.Date,
+                    Total = v.Total,
+                    Items = detalles
+                });
+            }
+            return r;
+        }
+
+        /// <summary>
+        /// Procesa una venta de forma completamente atómica usando una transacción EF Core.
+        /// Si cualquier paso falla, todos los cambios se revierten (rollback automático).
+        /// </summary>
         public async Task<bool> ProcesarVentaAsync(Venta venta, List<VentaDetalle> detalles)
         {
-            // Lock everything sequentially to prevent race conditions during POS
-            // Since our JSON repo has a semaphore inside for reading/writing, 
-            // reading all and saving all within a single application-level operation isn't purely atomic across files, 
-            // but for a local MAUI app, it's sufficient unless another thread is calling at the exact same millisecond.
-            
-            var productos = await GetProductosAsync();
-            
-            // 1. Validate Stock strictly
-            foreach (var d in detalles)
+            await using var transaction = await _db.Database.BeginTransactionAsync();
+            try
             {
-                var p = productos.FirstOrDefault(x => x.Id == d.ProductoId);
-                if (p == null || p.Stock < d.Quantity)
+                // 1. Validar stock de todos los productos antes de hacer ningún cambio
+                foreach (var d in detalles)
                 {
-                    throw new Exception($"Stock insuficiente para el producto {(p?.Name ?? "Desconocido")}.");
+                    var producto = await _db.Productos.FindAsync(d.ProductoId)
+                        ?? throw new InvalidOperationException($"Producto con ID {d.ProductoId} no encontrado.");
+
+                    if (producto.Stock < d.Quantity)
+                        throw new InvalidOperationException($"Stock insuficiente para \"{producto.Name}\". Disponible: {producto.Stock}, solicitado: {d.Quantity}.");
                 }
-            }
 
-            // 2. Reduce Stock
-            foreach (var d in detalles)
-            {
-                var p = productos.First(x => x.Id == d.ProductoId);
-                p.Stock -= d.Quantity;
-            }
-            
-            // Generate NumeroVenta
-            var ventas = await VentaRepo.GetAllAsync();
-            venta.NumeroVenta = ventas.Count > 0 ? ventas.Max(x => x.NumeroVenta) + 1 : 1;
-            
-            ventas.Add(venta);
-
-            // Handle Payment Logic (Fiado vs Contado)
-            if (venta.IsFiado && venta.ClienteId.HasValue)
-            {
-                var ccs = await CuentaCorrienteRepo.GetAllAsync();
-                var cc = ccs.FirstOrDefault(x => x.ClienteId == venta.ClienteId.Value);
-                if (cc != null)
+                // 2. Descontar stock
+                foreach (var d in detalles)
                 {
-                    cc.Balance += venta.Total; // Add Debt
-                    await CuentaCorrienteRepo.SaveAllAsync(ccs);
+                    var producto = await _db.Productos.FindAsync(d.ProductoId)!;
+                    producto!.Stock -= d.Quantity;
                 }
-            }
-            else
-            {
-                // Contado - Ingreso
-                var movs = await MovimientoRepo.GetAllAsync();
-                movs.Add(new MovimientoFinanciero
+
+                // 3. Asignar número de venta secuencial
+                int maxNumero = await _db.Ventas.AnyAsync()
+                    ? await _db.Ventas.MaxAsync(v => v.NumeroVenta)
+                    : 0;
+                venta.NumeroVenta = maxNumero + 1;
+
+                _db.Ventas.Add(venta);
+
+                // 4. Manejo de pago: Fiado vs Contado
+                if (venta.IsFiado && venta.ClienteId.HasValue)
                 {
-                    Type = TipoMovimiento.Ingreso,
-                    Amount = venta.Total,
-                    Description = $"Venta #{venta.NumeroVenta}",
-                    VentaId = venta.Id
-                });
-                await MovimientoRepo.SaveAllAsync(movs);
+                    var cc = await _db.CuentasCorrientes.FirstOrDefaultAsync(x => x.ClienteId == venta.ClienteId.Value)
+                        ?? throw new InvalidOperationException("El cliente no tiene cuenta corriente asociada.");
+                    cc.Balance += venta.Total;
+                }
+                else
+                {
+                    // Pago contado → registrar ingreso financiero
+                    _db.MovimientosFinancieros.Add(new MovimientoFinanciero
+                    {
+                        Type = TipoMovimiento.Ingreso,
+                        Amount = venta.Total,
+                        Description = $"Venta #{venta.NumeroVenta}",
+                        VentaId = venta.Id
+                    });
+                }
+
+                // 5. Guardar detalles de venta
+                foreach (var d in detalles)
+                {
+                    d.VentaId = venta.Id;
+                    _db.VentaDetalles.Add(d);
+                }
+
+                // 6. Commit atómico
+                await _db.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return true;
             }
-
-            // Add Details
-            var vDetalles = await VentaDetalleRepo.GetAllAsync();
-            vDetalles.AddRange(detalles);
-
-            // Save all states
-            await ProductoRepo.SaveAllAsync(productos);
-            await VentaRepo.SaveAllAsync(ventas);
-            await VentaDetalleRepo.SaveAllAsync(vDetalles);
-
-            return true;
+            catch
+            {
+                await transaction.RollbackAsync();
+                throw; // Re-lanzar para que el componente muestre el error al usuario
+            }
         }
     }
 }

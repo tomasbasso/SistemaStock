@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Sistema_de_Stock.Data;
 
 namespace Sistema_de_Stock
 {
@@ -15,8 +17,18 @@ namespace Sistema_de_Stock
                 });
 
             builder.Services.AddMauiBlazorWebView();
-            builder.Services.AddSingleton<Sistema_de_Stock.Services.DataService>();
+
+            // ── Base de datos SQLite con EF Core ──────────────────────────
+            var dbPath = Path.Combine(FileSystem.AppDataDirectory, "stock.db");
+            builder.Services.AddDbContext<StockDbContext>(options =>
+                options.UseSqlite($"Data Source={dbPath}"),
+                ServiceLifetime.Transient);
+
+            // ── Servicios de la aplicación ────────────────────────────────
+            builder.Services.AddTransient<Sistema_de_Stock.Services.DataService>();
             builder.Services.AddSingleton<Sistema_de_Stock.Services.ReportService>();
+            builder.Services.AddSingleton<Sistema_de_Stock.Services.NotificationService>();
+            builder.Services.AddSingleton<Sistema_de_Stock.Services.PdfService>();
 
 #if DEBUG
             builder.Services.AddBlazorWebViewDeveloperTools();
