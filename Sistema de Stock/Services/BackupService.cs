@@ -54,30 +54,48 @@ namespace Sistema_de_Stock.Services
                     return await FilePicker.Default.PickAsync(new PickOptions
                     {
                         PickerTitle = "Selecciona el respaldo a restaurar",
+                        FileTypes = customFileType
                     });
                 });
 
                 if (pickResult == null)
                     return (false, "Cancelado por el usuario");
 
-                if (!pickResult.FileName.EndsWith(".db") && !pickResult.FileName.EndsWith(".sqlite"))
-                    return (false, "El archivo no tiene el formato correcto (.db o .sqlite)");
+                string ext = Path.GetExtension(pickResult.FileName).ToLower();
+                if (ext != ".db" && ext != ".sqlite" && ext != ".sqlite3")
+                    return (false, $"El archivo '{pickResult.FileName}' no tiene una extensión válida (.db, .sqlite, .sqlite3)");
 
-                // Cerrar cualquier conexión temporal es difícil en caliente con EF Core si hay Scoped contexts
-                // Sin embargo, en MAUI con DB local reescribir el archivo suele funcionar si aseguramos que no se esté escribiendo
-                var tempPath = Path.Combine(FileSystem.CacheDirectory, pickResult.FileName);
+                // 1. IMPORTANTE: Limpiar los pools de conexiones de SQLite
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+                // 2. Copiar el archivo elegido a una ubicación temporal de caché
+                var tempPath = Path.Combine(FileSystem.CacheDirectory, "temp_restore.db");
                 
-                // Read from picker stream
                 using (var stream = await pickResult.OpenReadAsync())
-                using (var tempFile = File.OpenWrite(tempPath))
                 {
-                    await stream.CopyToAsync(tempFile);
+                    if (stream.Length == 0)
+                        return (false, "El archivo seleccionado está vacío.");
+
+                    using (var tempFile = File.Create(tempPath))
+                    {
+                        await stream.CopyToAsync(tempFile);
+                    }
                 }
 
-                // Move file (overwrite)
+                // 3. Eliminar archivos "sidecar" de SQLite (WAL mode) si existen
+                string walPath = _dbPath + "-wal";
+                string shmPath = _dbPath + "-shm";
+
+                if (File.Exists(walPath)) File.Delete(walPath);
+                if (File.Exists(shmPath)) File.Delete(shmPath);
+
+                // 4. Mover archivo (sobrescribir)
                 File.Copy(tempPath, _dbPath, overwrite: true);
 
-                return (true, "Respaldo restaurado correctamente. Es recomendable reiniciar la aplicación.");
+                // Limpiar temporal
+                if (File.Exists(tempPath)) File.Delete(tempPath);
+
+                return (true, $"Respaldo '{pickResult.FileName}' restaurado correctamente. La aplicación DEBE reiniciarse.");
             }
             catch (Exception ex)
             {

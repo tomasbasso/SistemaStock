@@ -201,7 +201,7 @@
         var result = await Backup.RestoreBackupAsync();
         if (result.Success)
         {
-            backupMessage = "¡Respaldo importado! Por favor, REINICIA LA APP.";
+            backupMessage = "¡IMPORTANTE! Base de datos restaurada. CIERRA Y ABRE la aplicación para ver los nuevos datos.";
             Notifications.Success("Base de datos restaurada.");
         }
         else
