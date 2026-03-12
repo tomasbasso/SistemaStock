@@ -19,6 +19,8 @@ namespace Sistema_de_Stock.Data
         public DbSet<MovimientoFinanciero> MovimientosFinancieros { get; set; }
         public DbSet<Venta> Ventas { get; set; }
         public DbSet<VentaDetalle> VentaDetalles { get; set; }
+        public DbSet<Presupuesto> Presupuestos { get; set; }
+        public DbSet<PresupuestoDetalle> PresupuestoDetalles { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -93,6 +95,22 @@ namespace Sistema_de_Stock.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.UnitPrice).HasColumnType("TEXT");
             });
+
+            // --- Presupuestos ---
+            modelBuilder.Entity<Presupuesto>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Total).HasColumnType("TEXT");
+                entity.HasIndex(e => e.NumeroPresupuesto).IsUnique();
+                entity.Property(e => e.Notas).HasMaxLength(500);
+            });
+
+            // --- Presupuesto Detalles ---
+            modelBuilder.Entity<PresupuestoDetalle>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.UnitPrice).HasColumnType("TEXT");
+            });
         }
 
         /// <summary>
@@ -151,6 +169,26 @@ namespace Sistema_de_Stock.Data
                     command.CommandText = "ALTER TABLE Productos ADD COLUMN Ubicacion TEXT NOT NULL DEFAULT '';";
                     await command.ExecuteNonQueryAsync();
                 }
+
+                // Crear tablas de Presupuestos si no existen
+                command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS Presupuestos (
+                        Id TEXT PRIMARY KEY,
+                        NumeroPresupuesto INTEGER NOT NULL UNIQUE,
+                        Date TEXT NOT NULL,
+                        FechaVencimiento TEXT,
+                        Total TEXT NOT NULL,
+                        ClienteId TEXT,
+                        Notas TEXT NOT NULL DEFAULT ''
+                    );
+                    CREATE TABLE IF NOT EXISTS PresupuestoDetalles (
+                        Id TEXT PRIMARY KEY,
+                        PresupuestoId TEXT NOT NULL,
+                        ProductoId TEXT NOT NULL,
+                        Quantity INTEGER NOT NULL,
+                        UnitPrice TEXT NOT NULL
+                    );";
+                await command.ExecuteNonQueryAsync();
             }
 
             if (wasClosed) await connection.CloseAsync();
@@ -167,47 +205,10 @@ namespace Sistema_de_Stock.Data
             // --- Configuración inicial ---
             Configuraciones.Add(new ConfiguracionApp
             {
-                NombreNegocio = "Mi Ferretería",
+                NombreNegocio = "Comercial Kai Ken",
                 Moneda = "ARS"
             });
 
-            // --- Categorías de ferretería ---
-            var catHerramientas = new Categoria { Name = "Herramientas Manuales" };
-            var catElectricas = new Categoria { Name = "Herramientas Eléctricas" };
-            var catConstruccion = new Categoria { Name = "Materiales de Construcción" };
-
-            Categorias.AddRange(catHerramientas, catElectricas, catConstruccion);
-
-            // --- Productos de muestra ---
-            Productos.AddRange(
-                new Producto { Name = "Martillo Carpintero 600g", SKU = "HT-001", Price = 8500.00m, Stock = 50, StockMinimo = 10, CategoryId = catHerramientas.Id },
-                new Producto { Name = "Destornillador Phillips Pz2", SKU = "HT-002", Price = 3200.00m, Stock = 120, StockMinimo = 20, CategoryId = catHerramientas.Id },
-                new Producto { Name = "Taladro Percutor 700W Bosch", SKU = "EL-001", Price = 125000.00m, Stock = 15, StockMinimo = 5, CategoryId = catElectricas.Id },
-                new Producto { Name = "Amoladora Angular 115mm", SKU = "EL-002", Price = 89000.00m, Stock = 8, StockMinimo = 10, CategoryId = catElectricas.Id },
-                new Producto { Name = "Bolsa Cemento 50kg", SKU = "MT-001", Price = 9800.00m, Stock = 200, StockMinimo = 50, CategoryId = catConstruccion.Id },
-                new Producto { Name = "Arena Fina x Metro", SKU = "MT-002", Price = 15000.00m, Stock = 30, StockMinimo = 10, CategoryId = catConstruccion.Id }
-            );
-
-            // --- Clientes de muestra ---
-            var cli1 = new Cliente { Name = "Juan Pérez", Phone = "11-4567-8910", Address = "Av. Siempre Viva 123" };
-            var cli2 = new Cliente { Name = "Constructora El Sol S.A.", Phone = "11-9876-5432", Address = "Calle Comercial 456" };
-
-            Clientes.AddRange(cli1, cli2);
-
-            // --- Cuentas Corrientes (una por cliente) ---
-            CuentasCorrientes.AddRange(
-                new CuentaCorriente { ClienteId = cli1.Id, Balance = 0 },
-                new CuentaCorriente { ClienteId = cli2.Id, Balance = 45500.00m }
-            );
-
-            // --- Movimiento financiero inicial ---
-            MovimientosFinancieros.Add(new MovimientoFinanciero
-            {
-                Type = TipoMovimiento.Ingreso,
-                Amount = 150000,
-                Description = "Capital Inicial",
-                Date = DateTime.Today.AddHours(9)
-            });
 
             await SaveChangesAsync();
         }

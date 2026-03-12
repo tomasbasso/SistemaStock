@@ -128,6 +128,38 @@ namespace Sistema_de_Stock.Models
         public decimal UnitPrice { get; set; }
     }
 
+    public class Presupuesto
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        public int NumeroPresupuesto { get; set; }
+        public DateTime Date { get; set; } = DateTime.Now;
+        public DateTime? FechaVencimiento { get; set; }
+        public decimal Total { get; set; }
+        public Guid? ClienteId { get; set; }
+
+        [MaxLength(500)]
+        public string Notas { get; set; } = string.Empty;
+    }
+
+    public class PresupuestoDetalle
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid PresupuestoId { get; set; }
+
+        [Required]
+        public Guid ProductoId { get; set; }
+
+        [Range(1, int.MaxValue)]
+        public int Quantity { get; set; }
+
+        public decimal UnitPrice { get; set; }
+    }
+
     public class ConfiguracionApp
     {
         [Key]

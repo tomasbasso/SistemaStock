@@ -25,6 +25,15 @@ namespace Sistema_de_Stock.Services
         public List<string> Items { get; set; } = new();
     }
 
+    public class PresupuestoData
+    {
+        public Presupuesto Presupuesto { get; set; } = new();
+        public List<PresupuestoDetalle> Detalles { get; set; } = new();
+        public Dictionary<Guid, string> NombreProductos { get; set; } = new();
+        public Cliente? Cliente { get; set; }
+        public ConfiguracionApp Config { get; set; } = new();
+    }
+
     public class RemitoVentaData
     {
         public Venta Venta { get; set; } = new();
@@ -345,6 +354,150 @@ namespace Sistema_de_Stock.Services
                     {
                         row.RelativeItem().Text($"Generado el {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(7).FontColor("#94a3b8");
                         row.RelativeItem().AlignRight().Text("No válido como comprobante fiscal").FontSize(7).FontColor("#94a3b8").Italic();
+                    });
+                });
+            }).GeneratePdf();
+        }
+
+        public byte[] GenerarPresupuesto(PresupuestoData data)
+        {
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A4);
+                    page.Margin(40);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
+
+                    page.Header().Column(col =>
+                    {
+                        col.Item().Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(data.Config.NombreNegocio).FontSize(22).Bold().FontColor("#1e293b");
+                                if (!string.IsNullOrEmpty(data.Config.DireccionNegocio))
+                                    c.Item().Text(data.Config.DireccionNegocio).FontSize(9).FontColor("#64748b");
+                                if (!string.IsNullOrEmpty(data.Config.Telefono))
+                                    c.Item().Text($"Tel: {data.Config.Telefono}").FontSize(9).FontColor("#64748b");
+                            });
+                            row.ConstantItem(180).Column(c =>
+                            {
+                                c.Item().Background("#0f766e").Padding(14).Column(inner =>
+                                {
+                                    inner.Item().Text("PRESUPUESTO").FontSize(15).Bold().FontColor("#ffffff").AlignCenter();
+                                    inner.Item().Text($"N° {data.Presupuesto.NumeroPresupuesto:D6}").FontSize(10).FontColor("#ccfbf1").AlignCenter();
+                                    inner.Item().Text(data.Presupuesto.Date.ToString("dd/MM/yyyy")).FontSize(8).FontColor("#ccfbf1").AlignCenter();
+                                });
+                            });
+                        });
+                        col.Item().PaddingTop(10).LineHorizontal(1.5f).LineColor("#0f766e");
+                    });
+
+                    page.Content().PaddingTop(16).Column(col =>
+                    {
+                        // Validez
+                        if (data.Presupuesto.FechaVencimiento.HasValue)
+                        {
+                            col.Item().Background("#f0fdf4").Border(0.5f).BorderColor("#86efac").Padding(8).Row(row =>
+                            {
+                                row.AutoItem().Text("✓ ").FontSize(9).FontColor("#16a34a").Bold();
+                                row.RelativeItem().Text($"Válido hasta el {data.Presupuesto.FechaVencimiento.Value:dd/MM/yyyy}").FontSize(9).FontColor("#15803d").Bold();
+                            });
+                            col.Item().PaddingTop(10);
+                        }
+
+                        // Cliente
+                        if (data.Cliente != null)
+                        {
+                            col.Item().Background("#f1f5f9").Padding(12).Row(row =>
+                            {
+                                row.RelativeItem().Column(c =>
+                                {
+                                    c.Item().Text("DESTINATARIO").FontSize(7).FontColor("#64748b").Bold();
+                                    c.Item().Text(data.Cliente.Name).FontSize(13).Bold().FontColor("#1e293b");
+                                    if (!string.IsNullOrEmpty(data.Cliente.Phone))
+                                        c.Item().Text($"Tel: {data.Cliente.Phone}").FontSize(8).FontColor("#475569");
+                                    if (!string.IsNullOrEmpty(data.Cliente.Address))
+                                        c.Item().Text($"Dir: {data.Cliente.Address}").FontSize(8).FontColor("#475569");
+                                });
+                            });
+                            col.Item().PaddingTop(14);
+                        }
+
+                        // Tabla de items
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(cols =>
+                            {
+                                cols.ConstantColumn(40);
+                                cols.RelativeColumn();
+                                cols.ConstantColumn(80);
+                                cols.ConstantColumn(85);
+                            });
+
+                            table.Header(header =>
+                            {
+                                static void H(QuestPDF.Infrastructure.IContainer c, string t, bool right = false)
+                                {
+                                    var cell = c.Background("#0f766e").Padding(8);
+                                    if (right) cell.AlignRight().Text(t).Bold().FontColor("#ffffff").FontSize(9);
+                                    else cell.Text(t).Bold().FontColor("#ffffff").FontSize(9);
+                                }
+                                header.Cell().Element(c => H(c, "CANT"));
+                                header.Cell().Element(c => H(c, "DESCRIPCIÓN"));
+                                header.Cell().Element(c => H(c, "P. UNIT", true));
+                                header.Cell().Element(c => H(c, "SUBTOTAL", true));
+                            });
+
+                            bool alt = false;
+                            foreach (var d in data.Detalles)
+                            {
+                                var bg = alt ? "#f8fafc" : "#ffffff";
+                                alt = !alt;
+                                var nombre = data.NombreProductos.TryGetValue(d.ProductoId, out var n) ? n : "Producto";
+
+                                static QuestPDF.Infrastructure.IContainer Cell(QuestPDF.Infrastructure.IContainer c, string bgColor)
+                                    => c.Background(bgColor).BorderBottom(0.5f).BorderColor("#e2e8f0").Padding(8);
+
+                                table.Cell().Element(c => Cell(c, bg)).Text($"{d.Quantity}").FontSize(9);
+                                table.Cell().Element(c => Cell(c, bg)).Text(nombre).FontSize(9).FontColor("#334155");
+                                table.Cell().Element(c => Cell(c, bg)).AlignRight().Text($"{d.UnitPrice:C}").FontSize(9);
+                                table.Cell().Element(c => Cell(c, bg)).AlignRight().Text($"{d.UnitPrice * d.Quantity:C}").FontSize(9).Bold();
+                            }
+                        });
+
+                        // Total
+                        col.Item().PaddingTop(4).AlignRight().Width(165).Background("#0f766e").Padding(12).Row(row =>
+                        {
+                            row.RelativeItem().Text("TOTAL").FontSize(11).Bold().FontColor("#ffffff");
+                            row.AutoItem().Text($"{data.Presupuesto.Total:C}").FontSize(13).Bold().FontColor("#ccfbf1");
+                        });
+
+                        // Notas
+                        if (!string.IsNullOrWhiteSpace(data.Presupuesto.Notas))
+                        {
+                            col.Item().PaddingTop(20).Column(c =>
+                            {
+                                c.Item().Text("OBSERVACIONES").FontSize(8).Bold().FontColor("#64748b");
+                                c.Item().PaddingTop(4).Background("#f8fafc").Border(0.5f).BorderColor("#e2e8f0").Padding(10)
+                                    .Text(data.Presupuesto.Notas).FontSize(9).FontColor("#334155");
+                            });
+                        }
+
+                        col.Item().PaddingTop(24).Text("Los precios indicados no incluyen IVA salvo indicación expresa. Este presupuesto no constituye factura.")
+                            .FontSize(8).FontColor("#94a3b8").Italic();
+                    });
+
+                    page.Footer().BorderTop(0.5f).BorderColor("#cbd5e1").PaddingTop(8).Row(row =>
+                    {
+                        row.RelativeItem().Text($"Generado el {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(8).FontColor("#94a3b8");
+                        row.RelativeItem().AlignCenter().Text(data.Config.NombreNegocio).FontSize(8).FontColor("#94a3b8");
+                        row.RelativeItem().AlignRight().Text(x =>
+                        {
+                            x.Span("Pág. ").FontSize(8).FontColor("#94a3b8");
+                            x.CurrentPageNumber().FontSize(8).FontColor("#94a3b8");
+                        });
                     });
                 });
             }).GeneratePdf();

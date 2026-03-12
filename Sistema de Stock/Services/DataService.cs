@@ -138,6 +138,127 @@ namespace Sistema_de_Stock.Services
             await _db.SaveChangesAsync();
         }
 
+        /// <summary>
+        /// Importa productos desde un stream de Excel (.xlsx).
+        /// Columnas esperadas: SKU, Nombre, Precio (en ese orden o por nombre de cabecera).
+        /// Si ya existe un producto con el mismo SKU, actualiza precio y nombre.
+        /// Devuelve (importados, actualizados, errores).
+        /// </summary>
+        public async Task<(int Importados, int Actualizados, List<string> Errores)> ImportarProductosDesdeExcelAsync(Stream stream, Guid categoriaDefaultId)
+        {
+            int importados = 0, actualizados = 0;
+            var errores = new List<string>();
+
+            using var workbook = new ClosedXML.Excel.XLWorkbook(stream);
+            var ws = workbook.Worksheets.First();
+
+            // Detectar si la primera fila es cabecera
+            var firstCell = ws.Cell(1, 1).GetString().Trim().ToLower();
+            bool esEncabezado = firstCell.Contains("sku") || firstCell.Contains("cod") || firstCell.Contains("nombre") || firstCell.Contains("producto");
+            int startRow = esEncabezado ? 2 : 1;
+
+            // Detectar índices de columnas por cabecera (si hay)
+            int colSku = 1, colNombre = 2, colPrecio = 3;
+            if (startRow == 2)
+            {
+                for (int c = 1; c <= ws.LastColumnUsed().ColumnNumber(); c++)
+                {
+                    var h = ws.Cell(1, c).GetString().Trim().ToLower();
+                    if (h.Contains("sku") || h.Contains("cod")) colSku = c;
+                    else if (h.Contains("nombre") || h.Contains("producto") || h.Contains("descrip")) colNombre = c;
+                    else if (h.Contains("precio") || h.Contains("price") || h.Contains("costo") || h.Contains("valor")) colPrecio = c;
+                }
+            }
+
+            var lastRow = ws.LastRowUsed()?.RowNumber() ?? 0;
+            var skusExistentes = await _db.Productos.ToDictionaryAsync(p => p.SKU.ToLower(), p => p);
+
+            for (int row = startRow; row <= lastRow; row++)
+            {
+                try
+                {
+                    var sku = ws.Cell(row, colSku).GetString().Trim();
+                    var nombre = ws.Cell(row, colNombre).GetString().Trim();
+                    var precioStr = ws.Cell(row, colPrecio).GetString().Trim().Replace("$", "").Replace(".", "").Replace(",", ".");
+
+                    if (string.IsNullOrWhiteSpace(nombre)) continue;
+
+                    if (!decimal.TryParse(precioStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal precio) || precio < 0)
+                    {
+                        errores.Add($"Fila {row}: precio inválido '{ws.Cell(row, colPrecio).GetString()}'");
+                        continue;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(sku))
+                        sku = $"IMP-{row:D4}";
+
+                    if (skusExistentes.TryGetValue(sku.ToLower(), out var existing))
+                    {
+                        existing.Name = nombre;
+                        existing.Price = precio;
+                        actualizados++;
+                    }
+                    else
+                    {
+                        var nuevo = new Producto
+                        {
+                            Name = nombre,
+                            SKU = sku,
+                            Price = precio,
+                            CategoryId = categoriaDefaultId,
+                            Stock = 5,
+                            StockMinimo = 0,
+                            UnidadMedida = "u."
+                        };
+                        _db.Productos.Add(nuevo);
+                        importados++;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    errores.Add($"Fila {row}: {ex.Message}");
+                }
+            }
+
+            await _db.SaveChangesAsync();
+            return (importados, actualizados, errores);
+        }
+
+        // ── Presupuestos ────────────────────────────────────────────
+        public async Task<List<Presupuesto>> GetPresupuestosAsync()
+            => await _db.Presupuestos.OrderByDescending(p => p.Date).ToListAsync();
+
+        public async Task<List<PresupuestoDetalle>> GetPresupuestoDetallesAsync(Guid presupuestoId)
+            => await _db.PresupuestoDetalles.Where(d => d.PresupuestoId == presupuestoId).ToListAsync();
+
+        public async Task<Presupuesto> SavePresupuestoAsync(Presupuesto presupuesto, List<PresupuestoDetalle> detalles)
+        {
+            // Número secuencial
+            int maxNum = await _db.Presupuestos.AnyAsync()
+                ? await _db.Presupuestos.MaxAsync(p => p.NumeroPresupuesto)
+                : 0;
+            presupuesto.NumeroPresupuesto = maxNum + 1;
+            presupuesto.Total = detalles.Sum(d => d.UnitPrice * d.Quantity);
+
+            _db.Presupuestos.Add(presupuesto);
+            foreach (var d in detalles)
+            {
+                d.PresupuestoId = presupuesto.Id;
+                _db.PresupuestoDetalles.Add(d);
+            }
+            await _db.SaveChangesAsync();
+            return presupuesto;
+        }
+
+        public async Task DeletePresupuestoAsync(Guid id)
+        {
+            var detalles = await _db.PresupuestoDetalles.Where(d => d.PresupuestoId == id).ToListAsync();
+            _db.PresupuestoDetalles.RemoveRange(detalles);
+            var p = await _db.Presupuestos.FindAsync(id);
+            if (p != null) _db.Presupuestos.Remove(p);
+            await _db.SaveChangesAsync();
+        }
+
         public async Task DeleteProductoAsync(Guid id)
         {
             var entity = await _db.Productos.FindAsync(id);

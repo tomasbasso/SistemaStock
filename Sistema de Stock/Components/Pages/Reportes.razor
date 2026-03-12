@@ -1,13 +1,18 @@
 @page "/reportes"
+@using Sistema_de_Stock.Models
+@using Sistema_de_Stock.Services
+@using Sistema_de_Stock.Components.Shared
 @inject DataService Data
 @inject ReportService Reports
+@inject PdfService PdfSvc
+@inject NotificationService Notifications
 
 <div class="max-w-5xl mx-auto">
     
     <!-- Header -->
     <div class="mb-8">
         <h2 class="page-title mb-1">Reportes y Exportación</h2>
-        <p class="page-subtitle">Genera reportes en formato Excel</p>
+        <p class="page-subtitle">Genera reportes en formato Excel y remitos de ventas</p>
     </div>
 
     @if (isLoading)
@@ -30,7 +35,7 @@
                     <p class="text-gray-400 text-sm mb-6">Estado actual de productos, precios y stock valorizado.</p>
                 </div>
                 <button @onclick="ExportarInventario" disabled="@isExporting" class="w-full bg-white/5 hover:bg-[var(--color-primary)] hover:text-white border border-white/10 text-gray-300 font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    @if(currentExport == "inventario")
+                    @if (currentExport == "inventario")
                     {
                         <i class="bi bi-hourglass-split animate-spin mr-2"></i><span>Generando...</span>
                     }
@@ -51,7 +56,7 @@
                     <p class="text-gray-400 text-sm mb-6">Listado completo de ventas, clientes y métodos de pago.</p>
                 </div>
                 <button @onclick="ExportarVentas" disabled="@isExporting" class="w-full bg-white/5 hover:bg-[var(--color-success)] hover:text-white border border-white/10 text-gray-300 font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    @if(currentExport == "ventas")
+                    @if (currentExport == "ventas")
                     {
                         <i class="bi bi-hourglass-split animate-spin mr-2"></i><span>Generando...</span>
                     }
@@ -71,8 +76,8 @@
                     <h3 class="text-xl font-semibold text-white mb-2">Movimientos Financieros</h3>
                     <p class="text-gray-400 text-sm mb-6">Ingresos, egresos y balance general del negocio.</p>
                 </div>
-                <button @onclick="ExportarFinanzas" disabled="@isExporting" class="w-full bg-white/5 hover:bg-[var(--color-warning)]-dark border border-white/10 text-gray-300 font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-warning)] hover:text-white">
-                    @if(currentExport == "finanzas")
+                <button @onclick="ExportarFinanzas" disabled="@isExporting" class="w-full bg-white/5 hover:bg-[var(--color-warning)] hover:text-white border border-white/10 text-gray-300 font-medium py-3 px-6 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    @if (currentExport == "finanzas")
                     {
                         <i class="bi bi-hourglass-split animate-spin mr-2"></i><span>Generando...</span>
                     }
@@ -99,38 +104,200 @@
                 <span>@errorMessage</span>
             </div>
         }
+
+        <!-- Historial de Ventas con Remito -->
+        <div class="mt-10">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Historial de Ventas</h3>
+                    <p class="text-sm text-gray-400">Reimprimir remito de cualquier venta anterior</p>
+                </div>
+                <div class="relative w-64">
+                    <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                    <input type="text" @bind="ventaSearch" @bind:event="oninput"
+                           placeholder="Buscar N° o cliente..."
+                           class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+                </div>
+            </div>
+
+            @if (isLoadingVentas)
+            {
+                <div class="premium-card p-8 flex items-center justify-center">
+                    <i class="bi bi-arrow-repeat animate-spin text-3xl text-gray-500"></i>
+                </div>
+            }
+            else if (!ventasFiltradas.Any())
+            {
+                <div class="premium-card p-10 text-center text-gray-500">
+                    <i class="bi bi-receipt text-4xl mb-3 block opacity-40"></i>
+                    <p>No hay ventas registradas.</p>
+                </div>
+            }
+            else
+            {
+                <div class="premium-card overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left whitespace-nowrap">
+                            <thead>
+                                <tr class="border-b border-white/10 bg-black/20 text-xs uppercase tracking-wider text-gray-400">
+                                    <th class="px-5 py-4 font-medium">N° Venta</th>
+                                    <th class="px-5 py-4 font-medium">Fecha</th>
+                                    <th class="px-5 py-4 font-medium">Cliente</th>
+                                    <th class="px-5 py-4 font-medium">Tipo</th>
+                                    <th class="px-5 py-4 font-medium text-right">Total</th>
+                                    <th class="px-5 py-4 font-medium text-right">Remito</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-white/5">
+                                @foreach (var v in ventasFiltradas)
+                                {
+                                    var clienteName = GetClienteName(v.ClienteId);
+                                    <tr class="hover:bg-white/5 transition-colors group">
+                                        <td class="px-5 py-3 font-mono text-sm text-gray-300">#@v.NumeroVenta.ToString("D6")</td>
+                                        <td class="px-5 py-3 text-sm text-gray-300">@v.Date.ToString("dd/MM/yyyy HH:mm")</td>
+                                        <td class="px-5 py-3 text-sm">
+                                            @if (!string.IsNullOrEmpty(clienteName))
+                                            {
+                                                <span class="text-white">@clienteName</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-gray-500 italic">Sin cliente</span>
+                                            }
+                                        </td>
+                                        <td class="px-5 py-3">
+                                            @if (v.IsFiado)
+                                            {
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-warning)]/20 text-[var(--color-warning)] border border-[var(--color-warning)]/30">Fiado</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--color-success)]/20 text-[var(--color-success)] border border-[var(--color-success)]/30">Contado</span>
+                                            }
+                                        </td>
+                                        <td class="px-5 py-3 text-sm font-medium text-right">@v.Total.ToString("C")</td>
+                                        <td class="px-5 py-3 text-right">
+                                            <button @onclick="() => ImprimirRemitoAsync(v)"
+                                                    disabled="@(printingVentaId == v.Id)"
+                                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-[var(--color-primary)] text-gray-300 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-white/10 hover:border-transparent">
+                                                @if (printingVentaId == v.Id)
+                                                {
+                                                    <i class="bi bi-arrow-repeat animate-spin"></i>
+                                                    <span>Generando...</span>
+                                                }
+                                                else
+                                                {
+                                                    <i class="bi bi-printer-fill"></i>
+                                                    <span>Remito PDF</span>
+                                                }
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+        </div>
     }
 
 </div>
 
 @code {
     private bool isLoading = true;
+    private bool isLoadingVentas = true;
     private bool isExporting = false;
     private string currentExport = "";
     private string successMessage = "";
     private string errorMessage = "";
 
-    protected override void OnInitialized()
+    private List<Venta> todasLasVentas = new();
+    private List<Cliente> clientes = new();
+    private string ventaSearch = "";
+    private Guid? printingVentaId = null;
+
+    private IEnumerable<Venta> ventasFiltradas => string.IsNullOrWhiteSpace(ventaSearch)
+        ? todasLasVentas
+        : todasLasVentas.Where(v =>
+            v.NumeroVenta.ToString().Contains(ventaSearch) ||
+            (v.ClienteId.HasValue && GetClienteName(v.ClienteId).Contains(ventaSearch, StringComparison.OrdinalIgnoreCase)));
+
+    protected override async Task OnInitializedAsync()
     {
         isLoading = false;
+        clientes = await Data.GetClientesAsync();
+        todasLasVentas = await Data.GetVentasAsync();
+        isLoadingVentas = false;
+    }
+
+    private string GetClienteName(Guid? clienteId)
+    {
+        if (!clienteId.HasValue) return "";
+        return clientes.FirstOrDefault(c => c.Id == clienteId.Value)?.Name ?? "";
+    }
+
+    private async Task ImprimirRemitoAsync(Venta venta)
+    {
+        printingVentaId = venta.Id;
+        StateHasChanged();
+        try
+        {
+            var detalles = await Data.GetVentaDetallesAsync(venta.Id);
+            var productos = await Data.GetProductosAsync();
+            var config = await Data.GetConfiguracionAsync() ?? new ConfiguracionApp();
+            Cliente? cliente = venta.ClienteId.HasValue
+                ? clientes.FirstOrDefault(c => c.Id == venta.ClienteId.Value)
+                : null;
+
+            var nombreProductos = productos.ToDictionary(p => p.Id, p => p.Name);
+
+            var remitoData = new RemitoVentaData
+            {
+                Venta = venta,
+                Detalles = detalles,
+                NombreProductos = nombreProductos,
+                Cliente = cliente,
+                Config = config
+            };
+
+            var pdfBytes = PdfSvc.GenerarRemitoVenta(remitoData);
+            using var stream = new MemoryStream(pdfBytes);
+            var fileName = $"Remito_{venta.NumeroVenta:D6}_{venta.Date:yyyyMMdd}.pdf";
+
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+
+            if (result.IsSuccessful)
+                Notifications.Success($"Remito #{venta.NumeroVenta:D6} guardado correctamente.");
+            else
+                Notifications.Error("No se pudo guardar el remito.");
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al generar remito: {ex.Message}");
+        }
+        finally
+        {
+            printingVentaId = null;
+        }
     }
 
     private string GetDesktopPath(string filename)
     {
         string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
         string finalPath = Path.Combine(desktopPath, filename);
-        
-        // Ensure unique name if exists
+
         int count = 1;
         string nameOnly = Path.GetFileNameWithoutExtension(filename);
         string extension = Path.GetExtension(filename);
-        
+
         while (File.Exists(finalPath))
         {
             string tempFileName = string.Format("{0}({1}){2}", nameOnly, count++, extension);
             finalPath = Path.Combine(desktopPath, tempFileName);
         }
-        
+
         return finalPath;
     }
 
@@ -142,7 +309,7 @@
         successMessage = "";
         StateHasChanged();
     }
-    
+
     private void ShowError(string msg)
     {
         errorMessage = msg;
@@ -154,24 +321,19 @@
         ResetMessages();
         currentExport = "inventario";
         isExporting = true;
-        
+
         try
         {
-            // Simulate processing time
-            await Task.Delay(500); 
-            
+            await Task.Delay(500);
             var productos = (await Data.GetProductosAsync()).OrderBy(x => x.Name).ToList();
             var categorias = await Data.GetCategoriasAsync();
-            
             var bytes = Reports.GenerateInventoryReport(productos, categorias);
-            
             string fileName = $"Reporte_Inventario_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
             string path = GetDesktopPath(fileName);
-            
             await File.WriteAllBytesAsync(path, bytes);
             _ = ShowSuccess(path);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             ShowError("Error al generar reporte: " + ex.Message);
         }
@@ -187,23 +349,19 @@
         ResetMessages();
         currentExport = "ventas";
         isExporting = true;
-        
+
         try
         {
             await Task.Delay(500);
-            
             var ventas = await Data.GetVentasAsync();
-            var clientes = await Data.GetClientesAsync();
-            
-            var bytes = Reports.GenerateSalesReport(ventas, clientes);
-            
+            var clientesList = await Data.GetClientesAsync();
+            var bytes = Reports.GenerateSalesReport(ventas, clientesList);
             string fileName = $"Reporte_Ventas_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
             string path = GetDesktopPath(fileName);
-            
             await File.WriteAllBytesAsync(path, bytes);
             _ = ShowSuccess(path);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             ShowError("Error al generar reporte: " + ex.Message);
         }
@@ -219,22 +377,18 @@
         ResetMessages();
         currentExport = "finanzas";
         isExporting = true;
-        
+
         try
         {
             await Task.Delay(500);
-            
             var movs = (await Data.GetMovimientosAsync()).ToList();
-            
             var bytes = Reports.GenerateFinancialReport(movs);
-            
             string fileName = $"Reporte_Finanzas_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
             string path = GetDesktopPath(fileName);
-            
             await File.WriteAllBytesAsync(path, bytes);
             _ = ShowSuccess(path);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             ShowError("Error al generar reporte: " + ex.Message);
         }

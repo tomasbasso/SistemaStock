@@ -14,6 +14,10 @@
             <p class="page-subtitle">Gestión de Productos y Stock</p>
         </div>
         <div class="flex gap-3">
+            <button @onclick="OpenImportarExcel" class="bg-white/10 hover:bg-white/15 text-white font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
+                <i class="bi bi-file-earmark-excel-fill text-[var(--color-success)]"></i>
+                <span class="hidden md:inline">Importar Excel</span>
+            </button>
             <button @onclick="OpenAjustePrecios" class="bg-white/10 hover:bg-white/15 text-white font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
                 <i class="bi bi-percent"></i>
                 <span class="hidden md:inline">Ajustar Precios</span>
@@ -306,6 +310,124 @@
     </div>
 </AppModal>
 
+<!-- Modal Importar Excel -->
+<AppModal IsOpen="isImportModalOpen" IsOpenChanged="(v) => { isImportModalOpen = v; if (!v) ResetImport(); }" Title="Importar Productos desde Excel">
+    @if (importResult == null)
+    {
+        <div class="space-y-5">
+            <!-- Instrucciones -->
+            <div class="bg-white/5 border border-white/10 rounded-xl p-4 text-sm text-gray-300 space-y-1">
+                <p class="font-semibold text-white mb-2"><i class="bi bi-info-circle-fill text-[var(--color-primary)] mr-2"></i>Formato esperado del Excel</p>
+                <p>El archivo puede tener cabeceras o no. Las columnas deben estar en este orden:</p>
+                <div class="mt-2 grid grid-cols-3 gap-2 text-xs">
+                    <div class="bg-[var(--color-primary)]/20 rounded-lg px-3 py-2 text-center">
+                        <p class="text-[var(--color-primary)] font-bold uppercase">Col A</p>
+                        <p class="text-white mt-1">SKU / Código</p>
+                        <p class="text-gray-500 mt-0.5">Opcional</p>
+                    </div>
+                    <div class="bg-[var(--color-primary)]/20 rounded-lg px-3 py-2 text-center">
+                        <p class="text-[var(--color-primary)] font-bold uppercase">Col B</p>
+                        <p class="text-white mt-1">Nombre del producto</p>
+                        <p class="text-gray-500 mt-0.5">Requerido</p>
+                    </div>
+                    <div class="bg-[var(--color-primary)]/20 rounded-lg px-3 py-2 text-center">
+                        <p class="text-[var(--color-primary)] font-bold uppercase">Col C</p>
+                        <p class="text-white mt-1">Precio</p>
+                        <p class="text-gray-500 mt-0.5">Requerido</p>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Si un SKU ya existe en el sistema, se actualizará el nombre y precio. Si no tiene SKU, se genera uno automático.</p>
+            </div>
+
+            <!-- Categoría por defecto -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Categoría para productos nuevos <span class="text-[var(--color-danger)]">*</span></label>
+                <select @bind="importCategoriaId" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-[var(--color-primary)]">
+                    <option value="">— Seleccionar categoría —</option>
+                    @foreach (var c in categorias)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Los productos importados quedarán en esta categoría. Podés cambiarla después.</p>
+            </div>
+
+            <!-- Selector de archivo -->
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1.5">Archivo Excel (.xlsx)</label>
+                <button @onclick="SeleccionarArchivoAsync"
+                        disabled="@isImporting"
+                        class="w-full border-2 border-dashed border-white/20 hover:border-[var(--color-primary)]/50 rounded-xl px-4 py-6 text-center transition-all group cursor-pointer @(importFileName != null ? "border-[var(--color-success)]/50 bg-[var(--color-success)]/5" : "")">
+                    @if (importFileName != null)
+                    {
+                        <i class="bi bi-file-earmark-excel-fill text-3xl text-[var(--color-success)] block mb-2"></i>
+                        <p class="text-white font-medium">@importFileName</p>
+                        <p class="text-xs text-gray-500 mt-1">Click para cambiar archivo</p>
+                    }
+                    else
+                    {
+                        <i class="bi bi-cloud-upload text-3xl text-gray-500 group-hover:text-[var(--color-primary)] block mb-2 transition-colors"></i>
+                        <p class="text-gray-400 group-hover:text-white transition-colors">Click para seleccionar archivo .xlsx</p>
+                    }
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end gap-3">
+            <button @onclick="() => isImportModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+            <button @onclick="EjecutarImportAsync"
+                    disabled="@(importFileStream == null || string.IsNullOrEmpty(importCategoriaId) || isImporting)"
+                    class="px-5 py-2.5 rounded-xl bg-[var(--color-success)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                @if (isImporting)
+                {
+                    <i class="bi bi-arrow-repeat animate-spin"></i>
+                    <span>Importando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-file-earmark-excel-fill"></i>
+                    <span>Importar</span>
+                }
+            </button>
+        </div>
+    }
+    else
+    {
+        <!-- Resultado -->
+        <div class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-xl p-4 text-center">
+                    <p class="text-3xl font-bold text-[var(--color-success)]">@importResult.Value.Importados</p>
+                    <p class="text-sm text-gray-400 mt-1">Productos nuevos</p>
+                </div>
+                <div class="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-xl p-4 text-center">
+                    <p class="text-3xl font-bold text-[var(--color-primary)]">@importResult.Value.Actualizados</p>
+                    <p class="text-sm text-gray-400 mt-1">Actualizados (SKU existente)</p>
+                </div>
+            </div>
+
+            @if (importResult.Value.Errores.Any())
+            {
+                <div class="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 rounded-xl p-4">
+                    <p class="text-sm font-semibold text-[var(--color-danger)] mb-2"><i class="bi bi-exclamation-triangle-fill mr-1"></i>@importResult.Value.Errores.Count fila(s) con error:</p>
+                    <div class="space-y-1 max-h-32 overflow-y-auto custom-scrollbar">
+                        @foreach (var err in importResult.Value.Errores)
+                        {
+                            <p class="text-xs text-gray-400">• @err</p>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="mt-6 flex justify-end">
+            <button @onclick="() => { isImportModalOpen = false; ResetImport(); }" class="px-6 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium">
+                Listo
+            </button>
+        </div>
+    }
+</AppModal>
+
 @code {
     private List<Producto> PaginatedItems = new();
     private List<Categoria> categorias = new();
@@ -354,6 +476,14 @@
         .Where(p => ajusteCategoriaFiltro == Guid.Empty || p.CategoryId == ajusteCategoriaFiltro)
         .OrderBy(p => GetCategoryName(p.CategoryId)).ThenBy(p => p.Name)
         .ToList();
+
+    // Importar Excel
+    private bool isImportModalOpen = false;
+    private bool isImporting = false;
+    private string? importFileName = null;
+    private Stream? importFileStream = null;
+    private string importCategoriaId = "";
+    private (int Importados, int Actualizados, List<string> Errores)? importResult = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -565,6 +695,83 @@
         finally
         {
             isApplyingAjuste = false;
+        }
+    }
+
+    // ── Importar Excel ───────────────────────────────────────────
+    private void OpenImportarExcel()
+    {
+        ResetImport();
+        isImportModalOpen = true;
+    }
+
+    private void ResetImport()
+    {
+        importFileName = null;
+        importFileStream?.Dispose();
+        importFileStream = null;
+        importCategoriaId = "";
+        importResult = null;
+        isImporting = false;
+    }
+
+    private async Task SeleccionarArchivoAsync()
+    {
+        try
+        {
+            var fileType = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>>
+            {
+                { DevicePlatform.WinUI, new[] { ".xlsx" } },
+                { DevicePlatform.Android, new[] { "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream" } }
+            });
+
+            var result = await MainThread.InvokeOnMainThreadAsync(() =>
+                FilePicker.Default.PickAsync(new PickOptions
+                {
+                    PickerTitle = "Seleccioná el archivo Excel (.xlsx)",
+                    FileTypes = fileType
+                }));
+
+            if (result == null) return;
+
+            importFileName = result.FileName;
+            importFileStream?.Dispose();
+            // Leemos todo el contenido en memoria para evitar problemas con el stream del picker
+            var rawStream = await result.OpenReadAsync();
+            var ms = new MemoryStream();
+            await rawStream.CopyToAsync(ms);
+            ms.Position = 0;
+            importFileStream = ms;
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al seleccionar archivo: {ex.Message}");
+        }
+    }
+
+    private async Task EjecutarImportAsync()
+    {
+        if (importFileStream == null || string.IsNullOrEmpty(importCategoriaId)) return;
+        isImporting = true;
+        try
+        {
+            importFileStream.Position = 0;
+            if (!Guid.TryParse(importCategoriaId, out var catId))
+            {
+                Notifications.Error("Categoría inválida.");
+                return;
+            }
+            var result = await Data.ImportarProductosDesdeExcelAsync(importFileStream, catId);
+            importResult = result;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al importar: {ex.Message}");
+        }
+        finally
+        {
+            isImporting = false;
         }
     }
 }
