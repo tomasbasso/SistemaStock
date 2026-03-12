@@ -124,7 +124,17 @@ namespace Sistema_de_Stock.Services
                 existing.Stock = p.Stock;
                 existing.StockMinimo = p.StockMinimo;
                 existing.Price = p.Price;
+                existing.UnidadMedida = p.UnidadMedida;
+                existing.Ubicacion = p.Ubicacion;
             }
+            await _db.SaveChangesAsync();
+        }
+
+        public async Task AjustarPreciosPorcentajeAsync(List<Guid> productoIds, decimal porcentaje)
+        {
+            var productos = await _db.Productos.Where(p => productoIds.Contains(p.Id)).ToListAsync();
+            foreach (var p in productos)
+                p.Price = Math.Round(p.Price * (1 + porcentaje / 100), 2);
             await _db.SaveChangesAsync();
         }
 
@@ -219,13 +229,17 @@ namespace Sistema_de_Stock.Services
 
         public async Task<(decimal Ingresos, decimal Egresos)> GetTotalesMovimientosAsync()
         {
-            var ingresos = await _db.MovimientosFinancieros
+            var movimientos = await _db.MovimientosFinancieros
+                .Select(m => new { m.Type, m.Amount })
+                .ToListAsync();
+
+            var ingresos = movimientos
                 .Where(m => m.Type == TipoMovimiento.Ingreso)
-                .SumAsync(m => m.Amount);
+                .Sum(m => m.Amount);
                 
-            var egresos = await _db.MovimientosFinancieros
+            var egresos = movimientos
                 .Where(m => m.Type == TipoMovimiento.Egreso)
-                .SumAsync(m => m.Amount);
+                .Sum(m => m.Amount);
                 
             return (ingresos, egresos);
         }

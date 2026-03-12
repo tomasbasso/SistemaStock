@@ -3,6 +3,8 @@
 @using Sistema_de_Stock.Services
 @using Sistema_de_Stock.Components.Shared
 @inject DataService Data
+@inject PdfService PdfSvc
+@inject NotificationService Notifications
 
 <div class="h-[calc(100vh-80px)] overflow-hidden flex flex-col md:flex-row gap-6">
 
@@ -214,9 +216,25 @@
         </div>
         <h3 class="text-2xl font-bold text-white mb-2">¡Venta Registrada!</h3>
         <p class="text-gray-400">El stock ha sido actualizado correctamente.</p>
+        @if (lastNumeroVenta > 0)
+        {
+            <p class="text-gray-500 text-sm mt-1">Venta N° @lastNumeroVenta.ToString("D6")</p>
+        }
     </div>
-    <div class="mt-8 flex justify-center">
-        <button @onclick="() => isSuccessModalOpen = false" class="px-8 py-3 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium w-full max-w-xs">
+    <div class="mt-8 flex flex-col gap-3 items-center">
+        <button @onclick="ImprimirRemitoAsync" disabled="@isPrintingRemito" class="px-8 py-3 rounded-xl bg-[var(--color-secondary)] hover:brightness-110 text-white transition-all font-medium w-full max-w-xs flex items-center justify-center gap-2">
+            @if (isPrintingRemito)
+            {
+                <i class="bi bi-arrow-repeat animate-spin"></i>
+                <span>Generando...</span>
+            }
+            else
+            {
+                <i class="bi bi-printer-fill"></i>
+                <span>Imprimir Remito PDF</span>
+            }
+        </button>
+        <button @onclick="() => isSuccessModalOpen = false" class="px-8 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white transition-all font-medium w-full max-w-xs">
             Nueva Venta
         </button>
     </div>
@@ -247,9 +265,16 @@
     private bool isCheckoutModalOpen = false;
     private bool isSuccessModalOpen = false;
     private bool isProcessingSale = false;
+    private bool isPrintingRemito = false;
     
     private Guid selectedClienteId = Guid.Empty;
     private bool isFiado = false;
+
+    // Datos de la última venta para el remito
+    private int lastNumeroVenta = 0;
+    private Venta? lastVenta;
+    private List<VentaDetalle> lastDetalles = new();
+    private List<CartItem> lastCartItems = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -339,6 +364,10 @@
             
             if (result)
             {
+                lastVenta = venta;
+                lastDetalles = detalles;
+                lastNumeroVenta = venta.NumeroVenta;
+                lastCartItems = new List<CartItem>(cartItems);
                 isCheckoutModalOpen = false;
                 ClearCart();
                 await LoadData(); // Refresh stock
@@ -353,6 +382,48 @@
         finally
         {
             isProcessingSale = false;
+        }
+    }
+
+    private async Task ImprimirRemitoAsync()
+    {
+        if (lastVenta == null || !lastDetalles.Any()) return;
+        isPrintingRemito = true;
+        try
+        {
+            var config = await Data.GetConfiguracionAsync() ?? new ConfiguracionApp();
+            Cliente? cliente = null;
+            if (lastVenta.ClienteId.HasValue)
+                cliente = (await Data.GetClientesAsync()).FirstOrDefault(c => c.Id == lastVenta.ClienteId.Value);
+
+            var nombreProductos = lastCartItems.ToDictionary(x => x.Producto.Id, x => x.Producto.Name);
+
+            var remitoData = new RemitoVentaData
+            {
+                Venta = lastVenta,
+                Detalles = lastDetalles,
+                NombreProductos = nombreProductos,
+                Cliente = cliente,
+                Config = config
+            };
+
+            var pdfBytes = PdfSvc.GenerarRemitoVenta(remitoData);
+            using var stream = new MemoryStream(pdfBytes);
+            var fileName = $"Remito_{lastVenta.NumeroVenta:D6}_{lastVenta.Date:yyyyMMdd}.pdf";
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+            if (result.IsSuccessful)
+                Notifications.Success("Remito guardado correctamente.");
+            else
+                Notifications.Error("No se pudo guardar el remito.");
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al generar remito: {ex.Message}");
+        }
+        finally
+        {
+            isPrintingRemito = false;
         }
     }
 }

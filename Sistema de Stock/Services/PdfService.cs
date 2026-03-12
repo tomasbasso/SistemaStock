@@ -25,6 +25,15 @@ namespace Sistema_de_Stock.Services
         public List<string> Items { get; set; } = new();
     }
 
+    public class RemitoVentaData
+    {
+        public Venta Venta { get; set; } = new();
+        public List<VentaDetalle> Detalles { get; set; } = new();
+        public Dictionary<Guid, string> NombreProductos { get; set; } = new();
+        public Cliente? Cliente { get; set; }
+        public ConfiguracionApp Config { get; set; } = new();
+    }
+
     /// <summary>
     /// Genera documentos PDF de estados de cuenta de clientes usando QuestPDF.
     /// </summary>
@@ -217,6 +226,126 @@ namespace Sistema_de_Stock.Services
                                 });
                         });
                     }
+                });
+            }).GeneratePdf();
+        }
+
+        /// <summary>
+        /// Genera el PDF del remito/comprobante de una venta individual.
+        /// </summary>
+        public byte[] GenerarRemitoVenta(RemitoVentaData data)
+        {
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.A5);
+                    page.Margin(30);
+                    page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
+
+                    page.Header().Column(col =>
+                    {
+                        col.Item().Row(row =>
+                        {
+                            row.RelativeItem().Column(c =>
+                            {
+                                c.Item().Text(data.Config.NombreNegocio).FontSize(18).Bold().FontColor("#1e293b");
+                                if (!string.IsNullOrEmpty(data.Config.DireccionNegocio))
+                                    c.Item().Text(data.Config.DireccionNegocio).FontSize(8).FontColor("#64748b");
+                                if (!string.IsNullOrEmpty(data.Config.Telefono))
+                                    c.Item().Text($"Tel: {data.Config.Telefono}").FontSize(8).FontColor("#64748b");
+                            });
+                            row.ConstantItem(130).Column(c =>
+                            {
+                                c.Item().Background("#1e40af").Padding(10).Column(inner =>
+                                {
+                                    inner.Item().Text("REMITO").FontSize(13).Bold().FontColor("#ffffff").AlignCenter();
+                                    inner.Item().Text($"N° {data.Venta.NumeroVenta:D6}").FontSize(10).FontColor("#bfdbfe").AlignCenter();
+                                    inner.Item().Text(data.Venta.Date.ToString("dd/MM/yyyy")).FontSize(8).FontColor("#bfdbfe").AlignCenter();
+                                });
+                            });
+                        });
+                        col.Item().PaddingTop(8).LineHorizontal(1.5f).LineColor("#1e40af");
+                    });
+
+                    page.Content().PaddingTop(12).Column(col =>
+                    {
+                        if (data.Cliente != null)
+                        {
+                            col.Item().Background("#f1f5f9").Padding(10).Row(row =>
+                            {
+                                row.RelativeItem().Column(c =>
+                                {
+                                    c.Item().Text("CLIENTE").FontSize(7).FontColor("#64748b").Bold();
+                                    c.Item().Text(data.Cliente.Name).FontSize(12).Bold().FontColor("#1e293b");
+                                    if (!string.IsNullOrEmpty(data.Cliente.Phone))
+                                        c.Item().Text($"Tel: {data.Cliente.Phone}").FontSize(8).FontColor("#475569");
+                                    if (!string.IsNullOrEmpty(data.Cliente.Address))
+                                        c.Item().Text($"Dir: {data.Cliente.Address}").FontSize(8).FontColor("#475569");
+                                });
+                                if (data.Venta.IsFiado)
+                                    row.ConstantItem(80).AlignRight().AlignMiddle()
+                                        .Text("FIADO").FontSize(9).Bold().FontColor("#dc2626");
+                            });
+                            col.Item().PaddingTop(10);
+                        }
+
+                        col.Item().Table(table =>
+                        {
+                            table.ColumnsDefinition(cols =>
+                            {
+                                cols.ConstantColumn(35);
+                                cols.RelativeColumn();
+                                cols.ConstantColumn(70);
+                                cols.ConstantColumn(75);
+                            });
+
+                            table.Header(header =>
+                            {
+                                static void H(QuestPDF.Infrastructure.IContainer c, string t, bool right = false)
+                                {
+                                    var cell = c.Background("#1e40af").Padding(6);
+                                    if (right) cell.AlignRight().Text(t).Bold().FontColor("#ffffff").FontSize(8);
+                                    else cell.Text(t).Bold().FontColor("#ffffff").FontSize(8);
+                                }
+                                header.Cell().Element(c => H(c, "CANT"));
+                                header.Cell().Element(c => H(c, "DESCRIPCIÓN"));
+                                header.Cell().Element(c => H(c, "P.UNIT", true));
+                                header.Cell().Element(c => H(c, "SUBTOTAL", true));
+                            });
+
+                            bool alt = false;
+                            foreach (var d in data.Detalles)
+                            {
+                                var bg = alt ? "#f8fafc" : "#ffffff";
+                                alt = !alt;
+                                var nombre = data.NombreProductos.TryGetValue(d.ProductoId, out var n) ? n : "Producto";
+
+                                static QuestPDF.Infrastructure.IContainer Cell(QuestPDF.Infrastructure.IContainer c, string bgColor)
+                                    => c.Background(bgColor).BorderBottom(0.5f).BorderColor("#e2e8f0").Padding(6);
+
+                                table.Cell().Element(c => Cell(c, bg)).Text($"{d.Quantity}").FontSize(9);
+                                table.Cell().Element(c => Cell(c, bg)).Text(nombre).FontSize(9).FontColor("#334155");
+                                table.Cell().Element(c => Cell(c, bg)).AlignRight().Text($"{d.UnitPrice:C}").FontSize(9);
+                                table.Cell().Element(c => Cell(c, bg)).AlignRight().Text($"{d.UnitPrice * d.Quantity:C}").FontSize(9).Bold();
+                            }
+                        });
+
+                        col.Item().PaddingTop(4).Background("#1e293b").Padding(10).Row(row =>
+                        {
+                            row.RelativeItem().Text(data.Venta.IsFiado ? "TOTAL  (Cuenta Corriente)" : "TOTAL  (Contado)").FontSize(10).Bold().FontColor("#ffffff");
+                            row.ConstantItem(90).AlignRight().Text($"{data.Venta.Total:C}").FontSize(12).Bold().FontColor("#fbbf24");
+                        });
+
+                        col.Item().PaddingTop(20).Text("Firma: ___________________________").FontSize(9).FontColor("#94a3b8");
+                        col.Item().PaddingTop(4).Text("Aclaración: ___________________________").FontSize(9).FontColor("#94a3b8");
+                    });
+
+                    page.Footer().BorderTop(0.5f).BorderColor("#cbd5e1").PaddingTop(6).Row(row =>
+                    {
+                        row.RelativeItem().Text($"Generado el {DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(7).FontColor("#94a3b8");
+                        row.RelativeItem().AlignRight().Text("No válido como comprobante fiscal").FontSize(7).FontColor("#94a3b8").Italic();
+                    });
                 });
             }).GeneratePdf();
         }

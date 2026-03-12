@@ -13,10 +13,16 @@
             <h2 class="page-title mb-1">Inventario</h2>
             <p class="page-subtitle">Gestión de Productos y Stock</p>
         </div>
-        <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
-            <i class="bi bi-plus-lg"></i>
-            <span>Nuevo Producto</span>
-        </button>
+        <div class="flex gap-3">
+            <button @onclick="OpenAjustePrecios" class="bg-white/10 hover:bg-white/15 text-white font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
+                <i class="bi bi-percent"></i>
+                <span class="hidden md:inline">Ajustar Precios</span>
+            </button>
+            <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+                <i class="bi bi-plus-lg"></i>
+                <span>Nuevo Producto</span>
+            </button>
+        </div>
     </div>
 
     <!-- Filters & Search -->
@@ -52,6 +58,7 @@
                             <th class="px-6 py-4 font-medium">SKU</th>
                             <th class="px-6 py-4 font-medium">Producto</th>
                             <th class="px-6 py-4 font-medium">Categoría</th>
+                            <th class="px-6 py-4 font-medium">Ubicación</th>
                             <th class="px-6 py-4 font-medium text-right">Precio</th>
                             <th class="px-6 py-4 font-medium">Stock</th>
                             <th class="px-6 py-4 font-medium text-right">Acciones</th>
@@ -66,6 +73,19 @@
                                     <div class="font-medium text-white">@item.Name</div>
                                 </td>
                                 <td class="px-6 py-4 text-sm text-gray-300">@GetCategoryName(item.CategoryId)</td>
+                                <td class="px-6 py-4 text-sm text-gray-400">
+                                    @if (!string.IsNullOrWhiteSpace(item.Ubicacion))
+                                    {
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/5 border border-white/10 text-xs">
+                                            <i class="bi bi-geo-alt-fill text-[var(--color-secondary)]"></i>
+                                            @item.Ubicacion
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="text-gray-600">—</span>
+                                    }
+                                </td>
                                 <td class="px-6 py-4 text-sm text-right font-medium">@item.Price.ToString("C")</td>
                                 <td class="px-6 py-4">
                                     @{
@@ -165,6 +185,15 @@
                 <ValidationMessage For="() => editingItem.StockMinimo" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
 
+            <div class="md:col-span-2">
+                <label class="block text-sm font-medium text-gray-300 mb-1">Ubicación <span class="text-gray-500">(Opcional — Ej: Estantería 2, Depósito A)</span></label>
+                <div class="relative">
+                    <i class="bi bi-geo-alt absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <InputText @bind-Value="editingItem.Ubicacion" placeholder="Ej: Estantería 2, Pasillo 3, Depósito A" class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                </div>
+                <ValidationMessage For="() => editingItem.Ubicacion" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
         </div>
 
         <div class="mt-8 flex justify-end gap-3">
@@ -183,6 +212,97 @@
     <div class="mt-6 flex justify-end gap-3">
         <button @onclick="() => isDeleteModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
         <button @onclick="ConfirmDelete" class="px-5 py-2.5 rounded-xl bg-[var(--color-danger)] hover:brightness-110 text-white transition-all font-medium">Eliminar</button>
+    </div>
+</AppModal>
+
+<!-- Ajuste de Precios Modal -->
+<AppModal IsOpen="isAjusteModalOpen" IsOpenChanged="(v) => { isAjusteModalOpen = v; }" Title="Ajuste de Precios por Porcentaje">
+    <div class="space-y-4">
+
+        <!-- Filtro por categoría -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Filtrar por Categoría</label>
+            <select @onchange="OnAjusteCategoriaChange" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]">
+                <option value="">— Todas las categorías —</option>
+                @foreach (var c in categorias)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+        </div>
+
+        <!-- Porcentaje -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Porcentaje de Aumento (%)</label>
+            <div class="flex items-center gap-3">
+                <div class="flex gap-2">
+                    @foreach (var pct in new[] { 2m, 5m, 10m, 15m, 20m })
+                    {
+                        <button type="button" @onclick="() => ajustePorcentaje = pct"
+                                class="px-3 py-1.5 rounded-lg text-sm font-medium transition-all @(ajustePorcentaje == pct ? "bg-[var(--color-primary)] text-white" : "bg-white/5 text-gray-300 hover:bg-white/10")">
+                            @pct%
+                        </button>
+                    }
+                </div>
+                <div class="relative flex-1">
+                    <input type="number" step="0.1" min="0.1" max="500" @bind="ajustePorcentaje"
+                           class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]" placeholder="Personalizado" />
+                    <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de productos seleccionables -->
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-medium text-gray-300">Productos (@ajusteProductosFiltrados.Count(p => ajusteSeleccionados.Contains(p.Id)) seleccionados de @ajusteProductosFiltrados.Count)</label>
+                <div class="flex gap-2 text-xs">
+                    <button type="button" @onclick="SeleccionarTodosAjuste" class="text-[var(--color-primary)] hover:underline">Seleccionar todos</button>
+                    <span class="text-gray-600">|</span>
+                    <button type="button" @onclick="() => ajusteSeleccionados.Clear()" class="text-gray-400 hover:underline">Limpiar</button>
+                </div>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                @foreach (var p in ajusteProductosFiltrados)
+                {
+                    bool selected = ajusteSeleccionados.Contains(p.Id);
+                    <div @onclick="() => ToggleAjusteProducto(p.Id)"
+                         class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all @(selected ? "bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30" : "bg-white/5 border border-transparent hover:bg-white/8")">
+                        <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all @(selected ? "bg-[var(--color-primary)] border-[var(--color-primary)]" : "border-gray-500")">
+                            @if (selected) { <i class="bi bi-check text-white" style="font-size:10px"></i> }
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <span class="text-sm text-white truncate block">@p.Name</span>
+                            <span class="text-xs text-gray-500">@GetCategoryName(p.CategoryId)</span>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <span class="text-sm text-[var(--color-secondary)] font-medium">@p.Price.ToString("C")</span>
+                            @if (selected && ajustePorcentaje > 0)
+                            {
+                                <span class="text-xs text-green-400 block">→ @(Math.Round(p.Price * (1 + ajustePorcentaje / 100), 2).ToString("C"))</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        @if (ajusteSeleccionados.Count > 0 && ajustePorcentaje > 0)
+        {
+            <div class="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-xl p-3">
+                <p class="text-sm text-white">Se aumentará el precio de <strong>@ajusteSeleccionados.Count producto(s)</strong> un <strong>@ajustePorcentaje%</strong>.</p>
+            </div>
+        }
+    </div>
+
+    <div class="mt-6 flex justify-end gap-3">
+        <button type="button" @onclick="() => isAjusteModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button type="button" @onclick="AplicarAjustePrecios" disabled="@(ajusteSeleccionados.Count == 0 || ajustePorcentaje <= 0 || isApplyingAjuste)"
+                class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            @if (isApplyingAjuste) { <i class="bi bi-arrow-repeat animate-spin"></i> }
+            Aplicar Aumento
+        </button>
     </div>
 </AppModal>
 
@@ -222,6 +342,18 @@
     private bool isEditMode = false;
     private Producto editingItem = new();
     private Producto? deletingItem;
+
+    // Ajuste de Precios
+    private bool isAjusteModalOpen = false;
+    private bool isApplyingAjuste = false;
+    private decimal ajustePorcentaje = 10;
+    private Guid ajusteCategoriaFiltro = Guid.Empty;
+    private HashSet<Guid> ajusteSeleccionados = new();
+    private List<Producto> todosLosProductos = new();
+    private List<Producto> ajusteProductosFiltrados => todosLosProductos
+        .Where(p => ajusteCategoriaFiltro == Guid.Empty || p.CategoryId == ajusteCategoriaFiltro)
+        .OrderBy(p => GetCategoryName(p.CategoryId)).ThenBy(p => p.Name)
+        .ToList();
 
     protected override async Task OnInitializedAsync()
     {
@@ -286,7 +418,8 @@
             Price = item.Price, 
             Stock = item.Stock, 
             StockMinimo = item.StockMinimo,
-            UnidadMedida = item.UnidadMedida
+            UnidadMedida = item.UnidadMedida,
+            Ubicacion = item.Ubicacion
         };
         isEditMode = true;
         isModalOpen = true;
@@ -381,6 +514,57 @@
                 Notifications.Error($"Error al eliminar: {ex.Message}");
                 isDeleteModalOpen = false;
             }
+        }
+    }
+
+    private async Task OpenAjustePrecios()
+    {
+        todosLosProductos = await Data.GetProductosAsync();
+        ajusteSeleccionados.Clear();
+        ajusteCategoriaFiltro = Guid.Empty;
+        ajustePorcentaje = 10;
+        isAjusteModalOpen = true;
+    }
+
+    private void OnAjusteCategoriaChange(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+            ajusteCategoriaFiltro = id;
+        else
+            ajusteCategoriaFiltro = Guid.Empty;
+        // Auto-select all products of that category
+        ajusteSeleccionados = ajusteProductosFiltrados.Select(p => p.Id).ToHashSet();
+    }
+
+    private void ToggleAjusteProducto(Guid id)
+    {
+        if (!ajusteSeleccionados.Remove(id))
+            ajusteSeleccionados.Add(id);
+    }
+
+    private void SeleccionarTodosAjuste()
+    {
+        ajusteSeleccionados = ajusteProductosFiltrados.Select(p => p.Id).ToHashSet();
+    }
+
+    private async Task AplicarAjustePrecios()
+    {
+        if (ajusteSeleccionados.Count == 0 || ajustePorcentaje <= 0) return;
+        isApplyingAjuste = true;
+        try
+        {
+            await Data.AjustarPreciosPorcentajeAsync(ajusteSeleccionados.ToList(), ajustePorcentaje);
+            Notifications.Success($"Se actualizaron {ajusteSeleccionados.Count} producto(s) con un aumento del {ajustePorcentaje}%.");
+            isAjusteModalOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al ajustar precios: {ex.Message}");
+        }
+        finally
+        {
+            isApplyingAjuste = false;
         }
     }
 }

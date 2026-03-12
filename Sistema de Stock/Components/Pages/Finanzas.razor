@@ -2,7 +2,9 @@
 @using Sistema_de_Stock.Models
 @using Sistema_de_Stock.Services
 @using Sistema_de_Stock.Components.Shared
+@implements IDisposable
 @inject DataService Data
+@inject NotificationService Notifications
 
 <div class="max-w-7xl mx-auto">
     
@@ -158,13 +160,26 @@
             if (_searchQuery != value)
             {
                 _searchQuery = value;
-                if (searchTimer != null)
-                {
-                    searchTimer.Stop();
-                    searchTimer.Start();
-                }
+                _ = DebounceSearch();
             }
         }
+    }
+
+    private CancellationTokenSource? debounceCts;
+
+    private async Task DebounceSearch()
+    {
+        debounceCts?.Cancel();
+        debounceCts = new CancellationTokenSource();
+        var token = debounceCts.Token;
+
+        try
+        {
+            await Task.Delay(400, token);
+            currentPage = 1;
+            await LoadData();
+        }
+        catch (TaskCanceledException) { }
     }
 
     private bool isModalOpen = false;
@@ -172,33 +187,35 @@
 
     protected override async Task OnInitializedAsync()
     {
-        searchTimer = new System.Timers.Timer(400);
-        searchTimer.Elapsed += SearchTimer_Elapsed;
-        searchTimer.AutoReset = false;
-
         await LoadData();
-    }
-
-    private void SearchTimer_Elapsed(object? sender, System.Timers.ElapsedEventArgs e)
-    {
-        currentPage = 1;
-        InvokeAsync(LoadData);
     }
 
     private async Task LoadData()
     {
-        isLoading = true;
-        StateHasChanged();
+        if (isLoading && items.Any()) return; // Avoid redundant loads if already loading and has data
 
-        var totales = await Data.GetTotalesMovimientosAsync();
-        TotalIngresos = totales.Ingresos;
-        TotalEgresos = totales.Egresos;
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
 
-        totalItems = await Data.GetTotalMovimientosAsync(searchQuery);
-        items = await Data.GetMovimientosPaginadosAsync(currentPage, pageSize, searchQuery);
-        
-        isLoading = false;
-        StateHasChanged();
+            var totales = await Data.GetTotalesMovimientosAsync();
+            TotalIngresos = totales.Ingresos;
+            TotalEgresos = totales.Egresos;
+
+            totalItems = await Data.GetTotalMovimientosAsync(searchQuery);
+            items = await Data.GetMovimientosPaginadosAsync(currentPage, pageSize, searchQuery);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Error en Finanzas.LoadData: {ex.Message}");
+            Notifications.Error("Error al cargar los datos financieros");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
     }
 
     private async Task HandlePageChange(int page)
@@ -217,8 +234,22 @@
     {
         if (string.IsNullOrWhiteSpace(nuevaTransaccion.Description) || nuevaTransaccion.Amount <= 0) return;
         
-        await Data.AddMovimientoAsync(nuevaTransaccion);
-        isModalOpen = false;
-        await LoadData();
+        try
+        {
+            await Data.AddMovimientoAsync(nuevaTransaccion);
+            isModalOpen = false;
+            Notifications.Success("Movimiento registrado con éxito");
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error("Error al guardar el movimiento");
+        }
+    }
+
+    public void Dispose()
+    {
+        debounceCts?.Cancel();
+        debounceCts?.Dispose();
     }
 }

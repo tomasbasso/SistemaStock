@@ -131,6 +131,26 @@ namespace Sistema_de_Stock.Data
                     command.CommandText = "ALTER TABLE Productos ADD COLUMN UnidadMedida TEXT NOT NULL DEFAULT 'u.';";
                     await command.ExecuteNonQueryAsync();
                 }
+
+                // Migración para columna Ubicacion
+                command.CommandText = "PRAGMA table_info(Productos);";
+                bool hasUbicacion = false;
+                using (var reader2 = await command.ExecuteReaderAsync())
+                {
+                    while (await reader2.ReadAsync())
+                    {
+                        if (string.Equals(reader2.GetString(1), "Ubicacion", StringComparison.OrdinalIgnoreCase))
+                        {
+                            hasUbicacion = true;
+                            break;
+                        }
+                    }
+                }
+                if (!hasUbicacion)
+                {
+                    command.CommandText = "ALTER TABLE Productos ADD COLUMN Ubicacion TEXT NOT NULL DEFAULT '';";
+                    await command.ExecuteNonQueryAsync();
+                }
             }
 
             if (wasClosed) await connection.CloseAsync();

@@ -43,6 +43,9 @@ namespace Sistema_de_Stock.Models
         [Required(ErrorMessage = "La unidad de medida es obligatoria.")]
         [MaxLength(20, ErrorMessage = "La unidad de medida no puede superar 20 caracteres.")]
         public string UnidadMedida { get; set; } = "u.";
+
+        [MaxLength(100, ErrorMessage = "La ubicación no puede superar 100 caracteres.")]
+        public string Ubicacion { get; set; } = string.Empty;
     }
 
     public class Cliente
