@@ -13,27 +13,76 @@ namespace Sistema_de_Stock.Services
             _dbPath = Path.Combine(FileSystem.AppDataDirectory, "stock.db");
         }
 
-        public async Task<bool> ExportBackupAsync(CancellationToken cancellationToken = default)
+        public async Task<(bool Success, string Message)> ExportBackupAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!File.Exists(_dbPath))
-                    return false;
+                    return (false, "No se encontró el archivo de la base de datos.");
 
-                using var stream = new FileStream(_dbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var fileName = $"Backup_Stock_{DateTime.Now:yyyyMMdd_HHmm}.db";
-                // MAUI dialogs deben ejecutarse en el MainThread
-                var fileSaverResult = await MainThread.InvokeOnMainThreadAsync(async () => 
+                // Create a temporary path for the backup
+                var tempBackupPath = Path.Combine(FileSystem.CacheDirectory, $"Backup_Temp_{Guid.NewGuid()}.db");
+
+                // Use SQLite's online backup API to ensure a fully consistent snapshot
+                // This correctly handles WAL (Write-Ahead Logging) mode, merging everything into one file.
+                using (var sourceConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_dbPath}"))
+                using (var destinationConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={tempBackupPath}"))
                 {
-                    return await FileSaver.Default.SaveAsync(fileName, stream, cancellationToken);
-                });
-                return fileSaverResult.IsSuccessful;
+                    await sourceConnection.OpenAsync(cancellationToken);
+                    await destinationConnection.OpenAsync(cancellationToken);
+
+                    sourceConnection.BackupDatabase(destinationConnection);
+                    
+                    // Cerrar explícitamente antes de salir del bloque using
+                    await destinationConnection.CloseAsync();
+                    await sourceConnection.CloseAsync();
+                }
+
+                // Liberar los handles de archivo de SQLite antes de que FileStream intente abrirlo
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                await Task.Delay(200, cancellationToken); // Pequeño respiro para el OS
+
+                var fileName = $"Backup_Stock_{DateTime.Now:yyyyMMdd_HHmm}.db";
+                bool isSuccessful = false;
+                Exception? saveException = null;
+
+                // Open the newly created, complete backup file
+                using (var stream = new FileStream(tempBackupPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                {
+                    // MAUI dialogs deben ejecutarse en el MainThread
+                    try 
+                    {
+                        var fileSaverResult = await MainThread.InvokeOnMainThreadAsync(async () => 
+                        {
+                            return await FileSaver.Default.SaveAsync(fileName, stream, cancellationToken);
+                        });
+                        isSuccessful = fileSaverResult.IsSuccessful;
+                    } 
+                    catch (Exception ex) 
+                    {
+                        saveException = ex;
+                    }
+                }
+
+                // Clean up the temporary backup file
+                if (File.Exists(tempBackupPath))
+                {
+                    try { File.Delete(tempBackupPath); } catch { /* Ignore cleanup errors */ }
+                }
+
+                if (saveException != null)
+                    return (false, $"Error interno al guardar: {saveException.Message}");
+                    
+                if (!isSuccessful)
+                    return (false, "La operación fue cancelada por el usuario o falló.");
+
+                return (true, "Backup exportado correctamente");
             }
             catch (Exception ex)
             {
                 // Manejar / loguear excepción
                 Console.WriteLine($"Error al exportar: {ex.Message}");
-                return false;
+                return (false, ex.Message);
             }
         }
 
@@ -65,7 +114,10 @@ namespace Sistema_de_Stock.Services
                 if (ext != ".db" && ext != ".sqlite" && ext != ".sqlite3")
                     return (false, $"El archivo '{pickResult.FileName}' no tiene una extensión válida (.db, .sqlite, .sqlite3)");
 
-                // 1. IMPORTANTE: Limpiar los pools de conexiones de SQLite
+                // 1. Limpieza AGRESIVA de conexiones y memoria
+                // Forzamos el GC para que disponga de cualquier DbContext o SqliteConnection que haya quedado boyando
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
                 Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
 
                 // 2. Copiar el archivo elegido a una ubicación temporal de caché
@@ -82,18 +134,49 @@ namespace Sistema_de_Stock.Services
                     }
                 }
 
-                // 3. Eliminar archivos "sidecar" de SQLite (WAL mode) si existen
-                string walPath = _dbPath + "-wal";
-                string shmPath = _dbPath + "-shm";
+                // 3. Reintentos para mover/sobreescribir (evitar "file in use")
+                int retries = 5;
+                bool success = false;
+                string lastError = "";
 
-                if (File.Exists(walPath)) File.Delete(walPath);
-                if (File.Exists(shmPath)) File.Delete(shmPath);
+                while (retries > 0 && !success)
+                {
+                    try
+                    {
+                        // Eliminar archivos "sidecar" de SQLite (WAL mode)
+                        string walPath = _dbPath + "-wal";
+                        string shmPath = _dbPath + "-shm";
 
-                // 4. Mover archivo (sobrescribir)
-                File.Copy(tempPath, _dbPath, overwrite: true);
+                        if (File.Exists(walPath)) File.Delete(walPath);
+                        if (File.Exists(shmPath)) File.Delete(shmPath);
 
-                // Limpiar temporal
+                        // Sobrescribir base de datos principal
+                        File.Copy(tempPath, _dbPath, overwrite: true);
+                        success = true;
+                    }
+                    catch (IOException)
+                    {
+                        retries--;
+                        if (retries > 0)
+                        {
+                            // Esperar un poco antes de reintentar
+                            await Task.Delay(500); 
+                            // Intentar limpiar pools de nuevo
+                            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        lastError = ex.Message;
+                        break;
+                    }
+                }
+
+                // Limpiar temporal de caché
                 if (File.Exists(tempPath)) File.Delete(tempPath);
+
+                if (!success)
+                    return (false, $"No se pudo completar la restauración. El archivo sigue bloqueado. {lastError}");
 
                 return (true, $"Respaldo '{pickResult.FileName}' restaurado correctamente. La aplicación DEBE reiniciarse.");
             }
