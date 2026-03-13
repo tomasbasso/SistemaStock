@@ -169,22 +169,22 @@
         backupMessage = "";
         StateHasChanged();
 
-        var success = await Backup.ExportBackupAsync();
-        if (success)
+        var result = await Backup.ExportBackupAsync();
+        if (result.Success)
         {
             backupMessage = "¡Respaldo exportado exitosamente!";
             Notifications.Success("Backup generado.");
         }
         else
         {
-            Notifications.Error("No se pudo exportar el backup o se canceló la operación.");
+            Notifications.Error(result.Message);
         }
 
         isBackuping = false;
         StateHasChanged();
         
         // Hide message after a few seconds
-        if (success)
+        if (result.Success)
         {
             await Task.Delay(3000);
             backupMessage = "";

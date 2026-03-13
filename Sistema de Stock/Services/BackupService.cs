@@ -1,5 +1,6 @@
 using CommunityToolkit.Maui.Storage;
 using Sistema_de_Stock.Data;
+using Sistema_de_Stock.Models;
 using System.IO;
 
 namespace Sistema_de_Stock.Services
@@ -13,12 +14,12 @@ namespace Sistema_de_Stock.Services
             _dbPath = Path.Combine(FileSystem.AppDataDirectory, "stock.db");
         }
 
-        public async Task<(bool Success, string Message)> ExportBackupAsync(CancellationToken cancellationToken = default)
+        public async Task<Result<string>> ExportBackupAsync(CancellationToken cancellationToken = default)
         {
             try
             {
                 if (!File.Exists(_dbPath))
-                    return (false, "No se encontró el archivo de la base de datos.");
+                    return Result<string>.Fail("No se encontró el archivo de la base de datos.");
 
                 // Create a temporary path for the backup
                 var tempBackupPath = Path.Combine(FileSystem.CacheDirectory, $"Backup_Temp_{Guid.NewGuid()}.db");
@@ -71,22 +72,22 @@ namespace Sistema_de_Stock.Services
                 }
 
                 if (saveException != null)
-                    return (false, $"Error interno al guardar: {saveException.Message}");
+                    return Result<string>.Fail($"Error interno al guardar: {saveException.Message}");
                     
                 if (!isSuccessful)
-                    return (false, "La operación fue cancelada por el usuario o falló.");
+                    return Result<string>.Fail("La operación fue cancelada por el usuario o falló.");
 
-                return (true, "Backup exportado correctamente");
+                return Result<string>.Ok("Backup exportado correctamente");
             }
             catch (Exception ex)
             {
                 // Manejar / loguear excepción
                 Console.WriteLine($"Error al exportar: {ex.Message}");
-                return (false, ex.Message);
+                return Result<string>.Fail(ex.Message);
             }
         }
 
-        public async Task<(bool Success, string Message)> RestoreBackupAsync()
+        public async Task<Result<string>> RestoreBackupAsync()
         {
             try
             {
@@ -108,11 +109,11 @@ namespace Sistema_de_Stock.Services
                 });
 
                 if (pickResult == null)
-                    return (false, "Cancelado por el usuario");
+                    return Result<string>.Fail("Cancelado por el usuario");
 
                 string ext = Path.GetExtension(pickResult.FileName).ToLower();
                 if (ext != ".db" && ext != ".sqlite" && ext != ".sqlite3")
-                    return (false, $"El archivo '{pickResult.FileName}' no tiene una extensión válida (.db, .sqlite, .sqlite3)");
+                    return Result<string>.Fail($"El archivo '{pickResult.FileName}' no tiene una extensión válida (.db, .sqlite, .sqlite3)");
 
                 // 1. Limpieza AGRESIVA de conexiones y memoria
                 // Forzamos el GC para que disponga de cualquier DbContext o SqliteConnection que haya quedado boyando
@@ -126,7 +127,7 @@ namespace Sistema_de_Stock.Services
                 using (var stream = await pickResult.OpenReadAsync())
                 {
                     if (stream.Length == 0)
-                        return (false, "El archivo seleccionado está vacío.");
+                        return Result<string>.Fail("El archivo seleccionado está vacío.");
 
                     using (var tempFile = File.Create(tempPath))
                     {
@@ -176,13 +177,13 @@ namespace Sistema_de_Stock.Services
                 if (File.Exists(tempPath)) File.Delete(tempPath);
 
                 if (!success)
-                    return (false, $"No se pudo completar la restauración. El archivo sigue bloqueado. {lastError}");
+                    return Result<string>.Fail($"No se pudo completar la restauración. El archivo sigue bloqueado. {lastError}");
 
-                return (true, $"Respaldo '{pickResult.FileName}' restaurado correctamente. La aplicación DEBE reiniciarse.");
+                return Result<string>.Ok($"Respaldo '{pickResult.FileName}' restaurado correctamente. La aplicación DEBE reiniciarse.");
             }
             catch (Exception ex)
             {
-                return (false, $"Error al restaurar: {ex.Message}");
+                return Result<string>.Fail($"Error al restaurar: {ex.Message}");
             }
         }
     }

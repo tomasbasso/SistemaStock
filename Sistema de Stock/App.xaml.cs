@@ -7,22 +7,21 @@ namespace Sistema_de_Stock
         public App(DataService dataService)
         {
             InitializeComponent();
-            MainPage = new MainPage();
 
-            // Inicializar la base de datos (aplica migraciones y seeding si es necesario)
-            // Se ejecuta al inicio para garantizar que la DB está lista antes de que cualquier
-            // componente intente leer datos.
-            Task.Run(async () =>
+           try
             {
-                try
-                {
-                    await dataService.InitializeAsync();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[ERROR] Fallo al inicializar la base de datos: {ex.Message}");
-                }
-            });
+                // Task.Run mueve la ejecución al thread pool, donde no hay
+                // SynchronizationContext que cause deadlock. GetAwaiter().GetResult()
+                // bloquea el hilo principal hasta que termine, garantizando que
+                // la DB esté lista antes de mostrar cualquier página.
+                Task.Run(async () => await dataService.InitializeAsync()).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ERROR] Fallo al inicializar la base de datos: {ex.Message}");
+            }
+
+            MainPage = new MainPage();
         }
     }
 }

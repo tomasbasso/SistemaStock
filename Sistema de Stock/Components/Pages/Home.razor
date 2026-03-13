@@ -203,27 +203,17 @@
     private async Task LoadData()
     {
         isLoading = true;
-        
-        DateTime hoyInicio = DateTime.Today;
-        DateTime hoyFin = DateTime.Today.AddDays(1).AddTicks(-1);
 
-        var ventas = await Data.GetVentasAsync();
-        var ventasHoyFiltradas = ventas.Where(x => x.Date >= hoyInicio && x.Date <= hoyFin).ToList();
-        
-        VentasHoy = ventasHoyFiltradas.Sum(x => x.Total);
-        CantidadVentasHoy = ventasHoyFiltradas.Count;
+        var data = await Data.GetDashboardDataAsync();
 
-        var cuentas = await Data.GetCuentasCorrientesAsync();
-        TotalDeuda = cuentas.Sum(x => x.Balance);
+        VentasHoy = data.TotalVentas;
+        CantidadVentasHoy = data.CantidadVentas;
+        TotalDeuda = data.TotalDeuda;
+        ValorInventario = data.ValorInventario;
+        TotalProductos = data.TotalProductos;
+        ProductosBajoStock = data.BajoStock;
+        UltimosMovimientos = data.UltimosMovimientos;
 
-        var productos = await Data.GetProductosAsync();
-        TotalProductos = productos.Count;
-        ValorInventario = productos.Sum(x => x.Price * Math.Max(0, x.Stock));
-        ProductosBajoStock = productos.Where(x => x.Stock <= x.StockMinimo).OrderBy(x => x.Stock).ToList();
-
-        var movs = await Data.GetMovimientosAsync();
-        UltimosMovimientos = movs.Where(x => x.Date >= hoyInicio && x.Date <= hoyFin).OrderByDescending(x => x.Date).ToList();
-        
         isLoading = false;
     }
 }

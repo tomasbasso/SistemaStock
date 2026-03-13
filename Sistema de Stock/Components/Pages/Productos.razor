@@ -235,6 +235,24 @@
             </select>
         </div>
 
+        <!-- Búsqueda por nombre -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Buscar Producto</label>
+            <div class="relative">
+                <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="text" @bind="ajusteBusqueda" @bind:event="oninput"
+                       placeholder="Buscar por nombre o SKU..."
+                       class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-9 py-2 text-white text-sm focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+                @if (!string.IsNullOrEmpty(ajusteBusqueda))
+                {
+                    <button type="button" @onclick="() => ajusteBusqueda = string.Empty"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                        <i class="bi bi-x-circle-fill text-sm"></i>
+                    </button>
+                }
+            </div>
+        </div>
+
         <!-- Porcentaje -->
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-1">Porcentaje de Aumento (%)</label>
@@ -470,10 +488,14 @@
     private bool isApplyingAjuste = false;
     private decimal ajustePorcentaje = 10;
     private Guid ajusteCategoriaFiltro = Guid.Empty;
+    private string ajusteBusqueda = "";
     private HashSet<Guid> ajusteSeleccionados = new();
     private List<Producto> todosLosProductos = new();
     private List<Producto> ajusteProductosFiltrados => todosLosProductos
         .Where(p => ajusteCategoriaFiltro == Guid.Empty || p.CategoryId == ajusteCategoriaFiltro)
+        .Where(p => string.IsNullOrWhiteSpace(ajusteBusqueda) ||
+                    p.Name.Contains(ajusteBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                    (p.SKU != null && p.SKU.Contains(ajusteBusqueda, StringComparison.OrdinalIgnoreCase)))
         .OrderBy(p => GetCategoryName(p.CategoryId)).ThenBy(p => p.Name)
         .ToList();
 
@@ -652,6 +674,7 @@
         todosLosProductos = await Data.GetProductosAsync();
         ajusteSeleccionados.Clear();
         ajusteCategoriaFiltro = Guid.Empty;
+        ajusteBusqueda = "";
         ajustePorcentaje = 10;
         isAjusteModalOpen = true;
     }
@@ -762,8 +785,15 @@
                 return;
             }
             var result = await Data.ImportarProductosDesdeExcelAsync(importFileStream, catId);
-            importResult = result;
-            await LoadData();
+            if (result.Success)
+            {
+                importResult = result.Data;
+                await LoadData();
+            }
+            else
+            {
+                Notifications.Error(result.Message);
+            }
         }
         catch (Exception ex)
         {

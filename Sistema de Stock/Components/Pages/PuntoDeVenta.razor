@@ -376,8 +376,8 @@
         }
         catch (Exception ex)
         {
-            // Ideally show toast error msg
-            Console.WriteLine(ex.Message);
+            isCheckoutModalOpen = false;
+            Notifications.Error($"Error al procesar la venta: {ex.Message}");
         }
         finally
         {

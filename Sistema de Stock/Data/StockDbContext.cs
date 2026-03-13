@@ -111,6 +111,12 @@ namespace Sistema_de_Stock.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.UnitPrice).HasColumnType("TEXT");
             });
+
+            // Query filters for soft deletes
+            modelBuilder.Entity<Producto>().HasQueryFilter(p => !p.IsDeleted);
+            modelBuilder.Entity<Cliente>().HasQueryFilter(c => !c.IsDeleted);
+            modelBuilder.Entity<Venta>().HasQueryFilter(v => !v.IsDeleted);
+            modelBuilder.Entity<Presupuesto>().HasQueryFilter(p => !p.IsDeleted);
         }
 
         /// <summary>
@@ -179,7 +185,8 @@ namespace Sistema_de_Stock.Data
                         FechaVencimiento TEXT,
                         Total TEXT NOT NULL,
                         ClienteId TEXT,
-                        Notas TEXT NOT NULL DEFAULT ''
+                        Notas TEXT NOT NULL DEFAULT '',
+                        IsDeleted INTEGER NOT NULL DEFAULT 0
                     );
                     CREATE TABLE IF NOT EXISTS PresupuestoDetalles (
                         Id TEXT PRIMARY KEY,
@@ -189,6 +196,58 @@ namespace Sistema_de_Stock.Data
                         UnitPrice TEXT NOT NULL
                     );";
                 await command.ExecuteNonQueryAsync();
+
+                // ── IsDeleted: Productos ──────────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Productos);";
+                bool hasIsDeletedProductos = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                        if (string.Equals(r.GetString(1), "IsDeleted", StringComparison.OrdinalIgnoreCase))
+                        { hasIsDeletedProductos = true; break; }
+                if (!hasIsDeletedProductos)
+                {
+                    command.CommandText = "ALTER TABLE Productos ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                // ── IsDeleted: Clientes ───────────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Clientes);";
+                bool hasIsDeletedClientes = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                        if (string.Equals(r.GetString(1), "IsDeleted", StringComparison.OrdinalIgnoreCase))
+                        { hasIsDeletedClientes = true; break; }
+                if (!hasIsDeletedClientes)
+                {
+                    command.CommandText = "ALTER TABLE Clientes ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                // ── IsDeleted: Ventas ─────────────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Ventas);";
+                bool hasIsDeletedVentas = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                        if (string.Equals(r.GetString(1), "IsDeleted", StringComparison.OrdinalIgnoreCase))
+                        { hasIsDeletedVentas = true; break; }
+                if (!hasIsDeletedVentas)
+                {
+                    command.CommandText = "ALTER TABLE Ventas ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                // ── IsDeleted: Presupuestos ───────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Presupuestos);";
+                bool hasIsDeletedPresupuestos = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                        if (string.Equals(r.GetString(1), "IsDeleted", StringComparison.OrdinalIgnoreCase))
+                        { hasIsDeletedPresupuestos = true; break; }
+                if (!hasIsDeletedPresupuestos)
+                {
+                    command.CommandText = "ALTER TABLE Presupuestos ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;";
+                    await command.ExecuteNonQueryAsync();
+                }
             }
 
             if (wasClosed) await connection.CloseAsync();

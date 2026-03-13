@@ -46,6 +46,8 @@ namespace Sistema_de_Stock.Models
 
         [MaxLength(100, ErrorMessage = "La ubicación no puede superar 100 caracteres.")]
         public string Ubicacion { get; set; } = string.Empty;
+
+        public bool IsDeleted { get; set; } = false;
     }
 
     public class Cliente
@@ -62,6 +64,8 @@ namespace Sistema_de_Stock.Models
 
         [MaxLength(300, ErrorMessage = "La dirección no puede superar 300 caracteres.")]
         public string Address { get; set; } = string.Empty;
+
+        public bool IsDeleted { get; set; } = false;
     }
 
     public class CuentaCorriente
@@ -109,6 +113,8 @@ namespace Sistema_de_Stock.Models
         public decimal Total { get; set; }
         public Guid? ClienteId { get; set; }
         public bool IsFiado { get; set; } = false;
+
+        public bool IsDeleted { get; set; } = false;
     }
 
     public class VentaDetalle
@@ -141,6 +147,8 @@ namespace Sistema_de_Stock.Models
 
         [MaxLength(500)]
         public string Notas { get; set; } = string.Empty;
+
+        public bool IsDeleted { get; set; } = false;
     }
 
     public class PresupuestoDetalle
