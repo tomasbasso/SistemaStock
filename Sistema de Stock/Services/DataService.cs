@@ -140,6 +140,7 @@ namespace Sistema_de_Stock.Services
                 existing.Stock = p.Stock;
                 existing.StockMinimo = p.StockMinimo;
                 existing.Price = p.Price;
+                existing.PrecioCosto = p.PrecioCosto;
                 existing.UnidadMedida = p.UnidadMedida;
                 existing.Ubicacion = p.Ubicacion;
             }
@@ -455,6 +456,36 @@ namespace Sistema_de_Stock.Services
         // ─────────────────────────────────────────────────────────
         // VENTAS
         // ─────────────────────────────────────────────────────────
+
+        public async Task<double> CalcularRotacionAnualAsync()
+        {
+            try 
+            {
+                var haceUnAnio = DateTime.Today.AddYears(-1);
+                
+                // Unidades vendidas (usando decimal para precisión en el cálculo intermedio)
+                var unidadesVendidas = await _db.VentaDetalles
+                    .Join(_db.Ventas, d => d.VentaId, v => v.Id, (d, v) => new { d, v })
+                    .Where(x => !x.v.IsDeleted && x.v.Date >= haceUnAnio)
+                    .SumAsync(x => (decimal)x.d.Quantity);
+                
+                // Stock actual
+                var stockActual = await _db.Productos
+                    .Where(p => !p.IsDeleted)
+                    .SumAsync(p => (decimal)p.Stock);
+                
+                if (stockActual == 0) return 0;
+                
+                var resultado = (double)(unidadesVendidas / stockActual);
+                return Math.Round(resultado, 2);
+            }
+            catch (Exception ex)
+            {
+                // TODO: Migrar a ILogger cuando se implemente logging centralizado
+                System.Diagnostics.Debug.WriteLine($"Error calculando rotación: {ex.Message}");
+                return 0;
+            }
+        }
 
         public async Task<List<Venta>> GetVentasAsync()
             => await _db.Ventas.OrderByDescending(v => v.Date).ToListAsync();

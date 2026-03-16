@@ -248,6 +248,19 @@ namespace Sistema_de_Stock.Data
                     command.CommandText = "ALTER TABLE Presupuestos ADD COLUMN IsDeleted INTEGER NOT NULL DEFAULT 0;";
                     await command.ExecuteNonQueryAsync();
                 }
+
+                // ── PrecioCosto: Productos ───────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Productos);";
+                bool hasPrecioCosto = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                        if (string.Equals(r.GetString(1), "PrecioCosto", StringComparison.OrdinalIgnoreCase))
+                        { hasPrecioCosto = true; break; }
+                if (!hasPrecioCosto)
+                {
+                    command.CommandText = "ALTER TABLE Productos ADD COLUMN PrecioCosto TEXT NOT NULL DEFAULT '0';";
+                    await command.ExecuteNonQueryAsync();
+                }
             }
 
             if (wasClosed) await connection.CloseAsync();

@@ -172,6 +172,12 @@
             </div>
 
             <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Precio de Costo</label>
+                <InputNumber @bind-Value="editingItem.PrecioCosto" step="0.01" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.PrecioCosto" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+
+            <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Unidad de Medida *</label>
                 <InputText @bind-Value="editingItem.UnidadMedida" placeholder="Ej: u., Kg, Lts, mts" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.UnidadMedida" class="text-[var(--color-danger)] text-xs mt-1 block" />
@@ -568,6 +574,7 @@
             SKU = item.SKU, 
             CategoryId = item.CategoryId, 
             Price = item.Price, 
+            PrecioCosto = item.PrecioCosto,
             Stock = item.Stock, 
             StockMinimo = item.StockMinimo,
             UnidadMedida = item.UnidadMedida,

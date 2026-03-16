@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @page "/dashboard"
 @inject DataService Data
 
@@ -83,6 +83,45 @@
                 </div>
             </div>
             
+        </div>
+
+        <!-- Segundo Nivel de KPIs -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            
+            <!-- Rotación Anual -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-info)]/10 transition-colors">
+                    <i class="bi bi-arrow-repeat text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="text-xs uppercase tracking-widest text-gray-500">Rotación Anual</p>
+                        <i class="bi bi-info-circle text-gray-500 cursor-help" 
+                           title="Veces que el inventario completo se vendió y repuso en el último año"></i>
+                    </div>
+                    <h3 class="text-3xl font-bold text-white mb-2">@RotacionAnual.ToString("N2")</h3>
+                    <div class="flex items-center gap-2">
+                        <p class="text-xs text-gray-400">veces/año</p>
+                        @if (RotacionAnual < 2)
+                        {
+                            <span class="px-2 py-0.5 rounded-full text-xs bg-yellow-500/20 text-yellow-400">
+                                Baja rotación
+                            </span>
+                        }
+                        else if (RotacionAnual >= 6)
+                        {
+                            <span class="px-2 py-0.5 rounded-full text-xs bg-green-500/20 text-green-400">
+                                Buena rotación
+                            </span>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <!-- Espacio para futuros KPIs -->
+            <div class="hidden lg:block"></div>
+            <div class="hidden lg:block"></div>
+
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -192,6 +231,7 @@
     private decimal TotalDeuda = 0;
     private decimal ValorInventario = 0;
     private int TotalProductos = 0;
+    private double RotacionAnual = 0;
     private List<Producto> ProductosBajoStock = new();
     private List<MovimientoFinanciero> UltimosMovimientos = new();
 
@@ -213,6 +253,9 @@
         TotalProductos = data.TotalProductos;
         ProductosBajoStock = data.BajoStock;
         UltimosMovimientos = data.UltimosMovimientos;
+
+        // Cargar Rotación Anual
+        RotacionAnual = await Data.CalcularRotacionAnualAsync();
 
         isLoading = false;
     }

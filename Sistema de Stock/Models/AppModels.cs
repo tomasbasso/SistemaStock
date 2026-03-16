@@ -40,6 +40,9 @@ namespace Sistema_de_Stock.Models
         [Range(0.01, double.MaxValue, ErrorMessage = "El precio debe ser mayor a cero.")]
         public decimal Price { get; set; } = 0;
 
+        [Range(0, double.MaxValue, ErrorMessage = "El precio de costo no puede ser negativo.")]
+        public decimal PrecioCosto { get; set; } = 0;
+
         [Required(ErrorMessage = "La unidad de medida es obligatoria.")]
         [MaxLength(20, ErrorMessage = "La unidad de medida no puede superar 20 caracteres.")]
         public string UnidadMedida { get; set; } = "u.";
