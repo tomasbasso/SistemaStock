@@ -1,5 +1,6 @@
 @page "/"
 @page "/dashboard"
+@using Sistema_de_Stock.Models
 @inject DataService Data
 
 <div class="max-w-7xl mx-auto">
@@ -118,9 +119,40 @@
                 </div>
             </div>
 
-            <!-- Espacio para futuros KPIs -->
-            <div class="hidden lg:block"></div>
-            <div class="hidden lg:block"></div>
+            <!-- Top 5 baja rotación -->
+            <div class="premium-card p-6 relative overflow-hidden group">
+                <div class="absolute -right-6 -top-6 text-white/5 group-hover:text-[var(--color-warning)]/10 transition-colors">
+                    <i class="bi bi-hourglass-split text-9xl"></i>
+                </div>
+                <div class="relative z-10">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-xs uppercase tracking-widest text-gray-500">Top 5 baja rotación</p>
+                        <a class="text-[var(--color-primary)] text-xs hover:underline" href="variacion-precios">Ver análisis completo</a>
+                    </div>
+                    <div class="space-y-2">
+                        @if (!TopRotacionBaja.Any())
+                        {
+                            <p class="text-gray-400 text-sm">Todo con rotación aceptable.</p>
+                        }
+                        else
+                        {
+                            @foreach (var item in TopRotacionBaja)
+                            {
+                                <div class="flex items-center justify-between text-sm bg-white/5 rounded-lg px-3 py-2">
+                                    <div class="flex-1">
+                                        <div class="text-white font-medium truncate">@item.Nombre</div>
+                                        <div class="text-[10px] text-gray-500">Stock: @item.StockActual | Ventas 12m: @item.UnidadesVendidas12m</div>
+                                    </div>
+                                    <div class="text-right">
+                                        <div class="text-yellow-300 font-bold">@item.Rotacion.ToString("N2")</div>
+                                        <div class="text-[10px] text-gray-500">Días sin venta: @item.DiasSinVenta</div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                </div>
+            </div>
 
         </div>
 
@@ -234,6 +266,7 @@
     private double RotacionAnual = 0;
     private List<Producto> ProductosBajoStock = new();
     private List<MovimientoFinanciero> UltimosMovimientos = new();
+    private List<RotacionProductoDto> TopRotacionBaja = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -256,6 +289,7 @@
 
         // Cargar Rotación Anual
         RotacionAnual = await Data.CalcularRotacionAnualAsync();
+        TopRotacionBaja = await Data.GetRotacionProductosAsync(null, null, true, 5);
 
         isLoading = false;
     }

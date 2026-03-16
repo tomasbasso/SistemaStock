@@ -1,12 +1,15 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Sistema_de_Stock.Data;
 using Sistema_de_Stock.Models;
+using System;
+using System.Data;
+using System.Globalization;
 
 namespace Sistema_de_Stock.Services
 {
     /// <summary>
     /// Servicio principal de acceso a datos, ahora basado en EF Core / SQLite.
-    /// Mantiene el mismo contrato público que antes para compatibilidad con los componentes Blazor.
+    /// Mantiene el mismo contrato pÃºblico que antes para compatibilidad con los componentes Blazor.
     /// </summary>
     public class DataService
     {
@@ -17,9 +20,9 @@ namespace Sistema_de_Stock.Services
             _db = db;
         }
 
-        // ─────────────────────────────────────────────────────────
-        // INICIALIZACIÓN
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // INICIALIZACIÃ“N
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         /// <summary>
         /// Inicializa la base de datos y aplica migraciones pendientes.
@@ -30,12 +33,23 @@ namespace Sistema_de_Stock.Services
             await _db.InitializeDatabaseAsync();
         }
 
-        // ─────────────────────────────────────────────────────────
-        // CONFIGURACIÓN
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // CONFIGURACIÃ“N
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<ConfiguracionApp?> GetConfiguracionAsync()
             => await _db.Configuraciones.FirstOrDefaultAsync();
+
+        public async Task CambiarStockAsync(Guid productoId, int variacion)
+        {
+            var p = await _db.Productos.FindAsync(productoId);
+            if (p != null)
+            {
+                p.Stock += variacion;
+                if (p.Stock < 0) p.Stock = 0;
+                await _db.SaveChangesAsync();
+            }
+        }
 
         public async Task SaveConfiguracionAsync(ConfiguracionApp config)
         {
@@ -52,9 +66,9 @@ namespace Sistema_de_Stock.Services
             await _db.SaveChangesAsync();
         }
 
-        // ─────────────────────────────────────────────────────────
-        // CATEGORÍAS
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // CATEGORÃAS
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<List<Categoria>> GetCategoriasAsync()
             => await _db.Categorias.OrderBy(c => c.Name).ToListAsync();
@@ -80,9 +94,9 @@ namespace Sistema_de_Stock.Services
             }
         }
 
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // PRODUCTOS
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<List<Producto>> GetProductosAsync()
             => await _db.Productos.OrderBy(p => p.Name).ToListAsync();
@@ -134,6 +148,7 @@ namespace Sistema_de_Stock.Services
                 _db.Productos.Add(p);
             else
             {
+                var precioAnterior = existing.Price;
                 existing.Name = p.Name;
                 existing.SKU = p.SKU;
                 existing.CategoryId = p.CategoryId;
@@ -143,6 +158,8 @@ namespace Sistema_de_Stock.Services
                 existing.PrecioCosto = p.PrecioCosto;
                 existing.UnidadMedida = p.UnidadMedida;
                 existing.Ubicacion = p.Ubicacion;
+
+                RegistrarHistorialPrecio(existing, precioAnterior, existing.Price);
             }
             await _db.SaveChangesAsync();
         }
@@ -151,7 +168,11 @@ namespace Sistema_de_Stock.Services
         {
             var productos = await _db.Productos.Where(p => productoIds.Contains(p.Id)).ToListAsync();
             foreach (var p in productos)
+            {
+                var precioAnterior = p.Price;
                 p.Price = Math.Round(p.Price * (1 + porcentaje / 100), 2);
+                RegistrarHistorialPrecio(p, precioAnterior, p.Price);
+            }
             await _db.SaveChangesAsync();
         }
 
@@ -174,7 +195,7 @@ namespace Sistema_de_Stock.Services
             bool esEncabezado = firstCell.Contains("sku") || firstCell.Contains("cod") || firstCell.Contains("nombre") || firstCell.Contains("producto");
             int startRow = esEncabezado ? 2 : 1;
 
-            // Detectar índices de columnas por cabecera (si hay)
+            // Detectar Ã­ndices de columnas por cabecera (si hay)
             int colSku = 1, colNombre = 2, colPrecio = 3;
             if (startRow == 2)
             {
@@ -203,7 +224,7 @@ namespace Sistema_de_Stock.Services
 
                     if (!decimal.TryParse(precioStr, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out decimal precio) || precio < 0)
                     {
-                        errores.Add($"Fila {row}: precio inválido '{rawPrecio}'");
+                        errores.Add($"Fila {row}: precio invÃ¡lido '{rawPrecio}'");
                         continue;
                     }
 
@@ -213,7 +234,10 @@ namespace Sistema_de_Stock.Services
                     if (skusExistentes.TryGetValue(sku.ToLower(), out var existing))
                     {
                         existing.Name = nombre;
+                        var precioAnterior = existing.Price;
                         existing.Price = precio;
+                        if (precioAnterior != existing.Price)
+                            RegistrarHistorialPrecio(existing, precioAnterior, existing.Price);
                         actualizados++;
                     }
                     else
@@ -242,7 +266,7 @@ namespace Sistema_de_Stock.Services
             return Result<(int, int, List<string>)>.Ok((importados, actualizados, errores));
         }
 
-        // ── Presupuestos ────────────────────────────────────────────
+        // â”€â”€ Presupuestos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         public async Task<List<Presupuesto>> GetPresupuestosAsync()
             => await _db.Presupuestos.OrderByDescending(p => p.Date).ToListAsync();
 
@@ -251,7 +275,7 @@ namespace Sistema_de_Stock.Services
 
         public async Task<Presupuesto> SavePresupuestoAsync(Presupuesto presupuesto, List<PresupuestoDetalle> detalles)
         {
-            // Número secuencial
+            // NÃºmero secuencial
             int maxNum = await _db.Presupuestos.AnyAsync()
                 ? await _db.Presupuestos.MaxAsync(p => p.NumeroPresupuesto)
                 : 0;
@@ -296,9 +320,9 @@ namespace Sistema_de_Stock.Services
             return await _db.Productos.AnyAsync(p => p.SKU == sku && p.Id != excludeId);
         }
 
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // CLIENTES & CUENTAS CORRIENTES
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<List<Cliente>> GetClientesAsync()
             => await _db.Clientes.OrderBy(c => c.Name).ToListAsync();
@@ -309,7 +333,7 @@ namespace Sistema_de_Stock.Services
             if (existing == null)
             {
                 _db.Clientes.Add(c);
-                // Crear cuenta corriente automáticamente al crear un cliente nuevo
+                // Crear cuenta corriente automÃ¡ticamente al crear un cliente nuevo
                 _db.CuentasCorrientes.Add(new CuentaCorriente { ClienteId = c.Id });
             }
             else
@@ -352,9 +376,9 @@ namespace Sistema_de_Stock.Services
             await _db.SaveChangesAsync();
         }
 
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // MOVIMIENTOS FINANCIEROS
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<List<MovimientoFinanciero>> GetMovimientosAsync()
             => await _db.MovimientosFinancieros.OrderByDescending(m => m.Date).ToListAsync();
@@ -453,36 +477,65 @@ namespace Sistema_de_Stock.Services
             }
         }
 
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         // VENTAS
-        // ─────────────────────────────────────────────────────────
+        // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
         public async Task<double> CalcularRotacionAnualAsync()
         {
             try 
             {
+                await EnsureSoftDeleteColumnsAsync();
+
                 var haceUnAnio = DateTime.Today.AddYears(-1);
-                
-                // Unidades vendidas (usando decimal para precisión en el cálculo intermedio)
-                var unidadesVendidas = await _db.VentaDetalles
-                    .Join(_db.Ventas, d => d.VentaId, v => v.Id, (d, v) => new { d, v })
-                    .Where(x => !x.v.IsDeleted && x.v.Date >= haceUnAnio)
-                    .SumAsync(x => (decimal)x.d.Quantity);
-                
-                // Stock actual
-                var stockActual = await _db.Productos
-                    .Where(p => !p.IsDeleted)
-                    .SumAsync(p => (decimal)p.Stock);
-                
+
+                var connection = _db.Database.GetDbConnection();
+                bool wasClosed = connection.State == ConnectionState.Closed;
+                if (wasClosed) await connection.OpenAsync();
+
+                using var command = connection.CreateCommand();
+                command.CommandText = @"
+                    SELECT
+                        COALESCE((
+                            SELECT SUM(CAST(vd.Quantity AS REAL))
+                            FROM VentaDetalles vd
+                            JOIN Ventas v ON v.Id = vd.VentaId
+                            WHERE (v.IsDeleted = 0 OR v.IsDeleted IS NULL)
+                              AND v.Date >= @Desde
+                        ), 0) AS UnidadesVendidas,
+                        COALESCE((
+                            SELECT SUM(CAST(p.Stock AS REAL))
+                            FROM Productos p
+                            WHERE (p.IsDeleted = 0 OR p.IsDeleted IS NULL)
+                        ), 0) AS StockActual;";
+
+                var param = command.CreateParameter();
+                param.ParameterName = "@Desde";
+                param.Value = haceUnAnio;
+                command.Parameters.Add(param);
+
+                double unidadesVendidas = 0;
+                double stockActual = 0;
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    if (await reader.ReadAsync())
+                    {
+                        unidadesVendidas = reader.IsDBNull(0) ? 0 : reader.GetDouble(0);
+                        stockActual = reader.IsDBNull(1) ? 0 : reader.GetDouble(1);
+                    }
+                }
+
+                if (wasClosed) await connection.CloseAsync();
+
                 if (stockActual == 0) return 0;
-                
-                var resultado = (double)(unidadesVendidas / stockActual);
+
+                var resultado = unidadesVendidas / stockActual;
                 return Math.Round(resultado, 2);
             }
             catch (Exception ex)
             {
                 // TODO: Migrar a ILogger cuando se implemente logging centralizado
-                System.Diagnostics.Debug.WriteLine($"Error calculando rotación: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error calculando rotaciÃ³n: {ex.Message}");
                 return 0;
             }
         }
@@ -494,7 +547,7 @@ namespace Sistema_de_Stock.Services
             => await _db.VentaDetalles.Where(d => d.VentaId == ventaId).ToListAsync();
 
         /// <summary>
-        /// Obtiene el historial de ventas en cuenta corriente de un cliente (sólo fiado) 
+        /// Obtiene el historial de ventas en cuenta corriente de un cliente (sÃ³lo fiado) 
         /// junto con sus detalles proyectados a texto para armar el PDF.
         /// </summary>
         public async Task<List<VentaFiadaDetalle>> GetVentasFiadasPorClienteAsync(Guid clienteId)
@@ -524,15 +577,15 @@ namespace Sistema_de_Stock.Services
         }
 
         /// <summary>
-        /// Procesa una venta de forma completamente atómica usando una transacción EF Core.
-        /// Si cualquier paso falla, todos los cambios se revierten (rollback automático).
+        /// Procesa una venta de forma completamente atÃ³mica usando una transacciÃ³n EF Core.
+        /// Si cualquier paso falla, todos los cambios se revierten (rollback automÃ¡tico).
         /// </summary>
         public async Task<bool> ProcesarVentaAsync(Venta venta, List<VentaDetalle> detalles)
         {
             await using var transaction = await _db.Database.BeginTransactionAsync();
             try
             {
-                // 1. Validar stock de todos los productos antes de hacer ningún cambio
+                // 1. Validar stock de todos los productos antes de hacer ningÃºn cambio
                 foreach (var d in detalles)
                 {
                     var producto = await _db.Productos.FindAsync(d.ProductoId)
@@ -549,7 +602,7 @@ namespace Sistema_de_Stock.Services
                     producto!.Stock -= d.Quantity;
                 }
 
-                // 3. Asignar número de venta secuencial
+                // 3. Asignar nÃºmero de venta secuencial
                 int maxNumero = await _db.Ventas.AnyAsync()
                     ? await _db.Ventas.MaxAsync(v => v.NumeroVenta)
                     : 0;
@@ -566,7 +619,7 @@ namespace Sistema_de_Stock.Services
                 }
                 else
                 {
-                    // Pago contado → registrar ingreso financiero
+                    // Pago contado â†’ registrar ingreso financiero
                     _db.MovimientosFinancieros.Add(new MovimientoFinanciero
                     {
                         Type = TipoMovimiento.Ingreso,
@@ -583,7 +636,7 @@ namespace Sistema_de_Stock.Services
                     _db.VentaDetalles.Add(d);
                 }
 
-                // 6. Commit atómico
+                // 6. Commit atÃ³mico
                 await _db.SaveChangesAsync();
                 await transaction.CommitAsync();
 
@@ -594,6 +647,229 @@ namespace Sistema_de_Stock.Services
                 await transaction.RollbackAsync();
                 throw; // Re-lanzar para que el componente muestre el error al usuario
             }
+        }
+        public async Task<List<HistorialPrecio>> GetHistorialPreciosAsync()
+            => await _db.HistorialPrecios.OrderByDescending(h => h.FechaModificacion).ToListAsync();
+
+        /// <summary>
+        /// Registra un cambio de precio en el historial sólo cuando hay variación.
+        /// </summary>
+        private void RegistrarHistorialPrecio(Producto producto, decimal precioAnterior, decimal precioNuevo)
+        {
+            if (precioAnterior == precioNuevo) return;
+
+            _db.HistorialPrecios.Add(new HistorialPrecio
+            {
+                ProductoId = producto.Id,
+                ProductoNombre = producto.Name,
+                FechaModificacion = DateTime.Now,
+                PrecioAnterior = precioAnterior,
+                PrecioNuevo = precioNuevo
+            });
+        }
+
+        private async Task<(decimal UmbralBaja, decimal UmbralMedia, int DiasSinVenta)> GetUmbralesAsync()
+        {
+            var config = await _db.Configuraciones.FirstOrDefaultAsync();
+            return (
+                config?.UmbralRotacionBaja ?? 1.0m,
+                config?.UmbralRotacionMedia ?? 4.0m,
+                config?.DiasAlertaSinVenta ?? 90
+            );
+        }
+
+        public async Task<List<RotacionProductoDto>> GetRotacionProductosAsync(Guid? categoriaId = null, string? search = null, bool soloBaja = false, int take = 200)
+        {
+            await EnsureSoftDeleteColumnsAsync();
+            var (umbralBaja, umbralMedia, diasSinVentaCfg) = await GetUmbralesAsync();
+
+            var connection = _db.Database.GetDbConnection();
+            bool wasClosed = connection.State == System.Data.ConnectionState.Closed;
+            if (wasClosed) await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = @"
+WITH ventas12 AS (
+    SELECT vd.ProductoId, SUM(vd.Quantity) AS ventas12
+    FROM VentaDetalles vd
+    JOIN Ventas v ON v.Id = vd.VentaId
+    WHERE (v.IsDeleted = 0 OR v.IsDeleted IS NULL)
+      AND v.Date >= @Desde12
+    GROUP BY vd.ProductoId
+),
+ventas3 AS (
+    SELECT vd.ProductoId, SUM(vd.Quantity) AS ventas3
+    FROM VentaDetalles vd
+    JOIN Ventas v ON v.Id = vd.VentaId
+    WHERE (v.IsDeleted = 0 OR v.IsDeleted IS NULL)
+      AND v.Date >= @Desde3
+    GROUP BY vd.ProductoId
+),
+ventasPrev3 AS (
+    SELECT vd.ProductoId, SUM(vd.Quantity) AS ventasPrev3
+    FROM VentaDetalles vd
+    JOIN Ventas v ON v.Id = vd.VentaId
+    WHERE (v.IsDeleted = 0 OR v.IsDeleted IS NULL)
+      AND v.Date < @Desde3 AND v.Date >= @Desde6
+    GROUP BY vd.ProductoId
+),
+ultimaVenta AS (
+    SELECT vd.ProductoId, MAX(v.Date) AS ultima
+    FROM VentaDetalles vd
+    JOIN Ventas v ON v.Id = vd.VentaId
+    WHERE (v.IsDeleted = 0 OR v.IsDeleted IS NULL)
+    GROUP BY vd.ProductoId
+)
+SELECT p.Id,
+       p.Name,
+       c.Name AS Categoria,
+       IFNULL(v12.ventas12, 0) AS Ventas12m,
+       CAST(p.Stock AS REAL) AS StockActual,
+       IFNULL(uv.ultima, NULL) AS UltimaVenta,
+       IFNULL(v3.ventas3, 0) AS Ventas3,
+       IFNULL(vp3.ventasPrev3, 0) AS VentasPrev3,
+       p.Price,
+       p.PrecioCosto
+FROM Productos p
+LEFT JOIN Categorias c ON c.Id = p.CategoryId
+LEFT JOIN ventas12 v12 ON v12.ProductoId = p.Id
+LEFT JOIN ventas3 v3 ON v3.ProductoId = p.Id
+LEFT JOIN ventasPrev3 vp3 ON vp3.ProductoId = p.Id
+LEFT JOIN ultimaVenta uv ON uv.ProductoId = p.Id
+WHERE (p.IsDeleted = 0 OR p.IsDeleted IS NULL)
+";
+
+            var desde12 = DateTime.Today.AddYears(-1);
+            var desde3 = DateTime.Today.AddMonths(-3);
+            var desde6 = DateTime.Today.AddMonths(-6);
+
+            void AddParam(string name, object? value)
+            {
+                var p = command.CreateParameter();
+                p.ParameterName = name;
+                p.Value = value ?? DBNull.Value;
+                command.Parameters.Add(p);
+            }
+
+            AddParam("@Desde12", desde12);
+            AddParam("@Desde3", desde3);
+            AddParam("@Desde6", desde6);
+
+            var results = new List<RotacionProductoDto>();
+            using (var reader = await command.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var stock = reader.IsDBNull(4) ? 0 : (decimal)reader.GetDouble(4);
+                    var ventas12 = reader.IsDBNull(3) ? 0 : reader.GetInt64(3);
+                    var price = reader.IsDBNull(8) ? 0 : (decimal)reader.GetDouble(8);
+                    var costo = reader.IsDBNull(9) ? 0 : (decimal)reader.GetDouble(9);
+                    DateTime? ultimaVenta = reader.IsDBNull(5) ? null : reader.GetDateTime(5);
+
+                    var rotacion = stock > 0 ? (decimal)ventas12 / Math.Max(1, stock) : 0;
+                    var diasSinVenta = ultimaVenta.HasValue ? (int)(DateTime.Today - ultimaVenta.Value.Date).TotalDays : 9999;
+                    var valorInmovilizado = stock * price;
+                    var margenUnitario = price > 0 ? (price - costo) / price : 0;
+
+                    var ventas3 = reader.IsDBNull(6) ? 0 : reader.GetInt64(6);
+                    var ventasPrev3 = reader.IsDBNull(7) ? 0 : reader.GetInt64(7);
+                    string tendencia = "→";
+                    if (ventas3 > ventasPrev3) tendencia = "↗";
+                    else if (ventas3 < ventasPrev3) tendencia = "↘";
+
+                    string estado = "Sin rotación";
+                    if (rotacion == 0) estado = "Sin rotación";
+                    else if (rotacion < umbralBaja) estado = "Baja";
+                    else if (rotacion < umbralMedia) estado = "Media";
+                    else estado = "Alta";
+
+                    string accion = estado switch
+                    {
+                        "Sin rotación" => "Descontinuar / limpiar stock",
+                        "Baja" => "Promocionar o ajustar precio",
+                        "Media" => "Monitorear",
+                        _ => "Mantener"
+                    };
+
+                    results.Add(new RotacionProductoDto
+                    {
+                        ProductoId = reader.GetGuid(0),
+                        Nombre = reader.GetString(1),
+                        Categoria = reader.IsDBNull(2) ? "" : reader.GetString(2),
+                        UnidadesVendidas12m = (int)ventas12,
+                        StockActual = stock,
+                        Rotacion = Math.Round(rotacion, 2),
+                        UltimaVenta = ultimaVenta,
+                        DiasSinVenta = diasSinVenta,
+                        ValorInmovilizado = Math.Round(valorInmovilizado, 2),
+                        MargenUnitario = Math.Round(margenUnitario, 2),
+                        Tendencia = tendencia,
+                        EstadoRotacion = estado,
+                        AccionSugerida = accion
+                    });
+                }
+            }
+
+            if (wasClosed) await connection.CloseAsync();
+
+            var query = results.AsEnumerable();
+            if (categoriaId.HasValue)
+            {
+                var categoria = await _db.Categorias.FirstOrDefaultAsync(c => c.Id == categoriaId.Value);
+                if (categoria != null)
+                    query = query.Where(r => string.Equals(r.Categoria, categoria.Name, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var s = search.ToLowerInvariant();
+                query = query.Where(r => r.Nombre.ToLower().Contains(s));
+            }
+            if (soloBaja)
+                query = query.Where(r => r.EstadoRotacion == "Sin rotación" || r.EstadoRotacion == "Baja");
+
+            return query
+                .OrderBy(r => r.Rotacion)
+                .ThenByDescending(r => r.DiasSinVenta)
+                .Take(take)
+                .ToList();
+        }
+
+        /// <summary>
+        /// Asegura que las columnas de soft delete existan en BD antiguas antes de usar filtros.
+        /// </summary>
+        private async Task EnsureSoftDeleteColumnsAsync()
+        {
+            await EnsureColumnAsync("Ventas", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
+            await EnsureColumnAsync("Productos", "IsDeleted", "INTEGER NOT NULL DEFAULT 0");
+        }
+
+        private async Task EnsureColumnAsync(string table, string column, string definitionSql)
+        {
+            var connection = _db.Database.GetDbConnection();
+            bool wasClosed = connection.State == System.Data.ConnectionState.Closed;
+            if (wasClosed) await connection.OpenAsync();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info({table});";
+            using var reader = await command.ExecuteReaderAsync();
+            bool found = false;
+            while (await reader.ReadAsync())
+            {
+                if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase))
+                {
+                    found = true;
+                    break;
+                }
+            }
+            await reader.CloseAsync();
+
+            if (!found)
+            {
+                command.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {definitionSql};";
+                await command.ExecuteNonQueryAsync();
+            }
+
+            if (wasClosed) await connection.CloseAsync();
         }
     }
 }

@@ -21,6 +21,7 @@ namespace Sistema_de_Stock.Data
         public DbSet<VentaDetalle> VentaDetalles { get; set; }
         public DbSet<Presupuesto> Presupuestos { get; set; }
         public DbSet<PresupuestoDetalle> PresupuestoDetalles { get; set; }
+        public DbSet<HistorialPrecio> HistorialPrecios { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -34,6 +35,9 @@ namespace Sistema_de_Stock.Data
                 entity.Property(e => e.Moneda).IsRequired().HasMaxLength(10);
                 entity.Property(e => e.DireccionNegocio).HasMaxLength(300);
                 entity.Property(e => e.Telefono).HasMaxLength(50);
+                entity.Property(e => e.UmbralRotacionBaja).HasColumnType("TEXT");
+                entity.Property(e => e.UmbralRotacionMedia).HasColumnType("TEXT");
+                entity.Property(e => e.DiasAlertaSinVenta);
             });
 
             // --- Categorias ---
@@ -110,6 +114,15 @@ namespace Sistema_de_Stock.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.UnitPrice).HasColumnType("TEXT");
+            });
+
+            // --- Historial Precios ---
+            modelBuilder.Entity<HistorialPrecio>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.ProductoNombre).IsRequired().HasMaxLength(200);
+                entity.Property(e => e.PrecioAnterior).HasColumnType("TEXT");
+                entity.Property(e => e.PrecioNuevo).HasColumnType("TEXT");
             });
 
             // Query filters for soft deletes
@@ -223,6 +236,35 @@ namespace Sistema_de_Stock.Data
                     await command.ExecuteNonQueryAsync();
                 }
 
+                // Configuracion umbrales rotación
+                command.CommandText = "PRAGMA table_info(Configuraciones);";
+                bool hasUmbralBaja = false, hasUmbralMedia = false, hasDiasSinVenta = false;
+                using (var r = await command.ExecuteReaderAsync())
+                {
+                    while (await r.ReadAsync())
+                    {
+                        var col = r.GetString(1);
+                        if (string.Equals(col, "UmbralRotacionBaja", StringComparison.OrdinalIgnoreCase)) hasUmbralBaja = true;
+                        if (string.Equals(col, "UmbralRotacionMedia", StringComparison.OrdinalIgnoreCase)) hasUmbralMedia = true;
+                        if (string.Equals(col, "DiasAlertaSinVenta", StringComparison.OrdinalIgnoreCase)) hasDiasSinVenta = true;
+                    }
+                }
+                if (!hasUmbralBaja)
+                {
+                    command.CommandText = "ALTER TABLE Configuraciones ADD COLUMN UmbralRotacionBaja TEXT NOT NULL DEFAULT '1.0';";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!hasUmbralMedia)
+                {
+                    command.CommandText = "ALTER TABLE Configuraciones ADD COLUMN UmbralRotacionMedia TEXT NOT NULL DEFAULT '4.0';";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!hasDiasSinVenta)
+                {
+                    command.CommandText = "ALTER TABLE Configuraciones ADD COLUMN DiasAlertaSinVenta INTEGER NOT NULL DEFAULT 90;";
+                    await command.ExecuteNonQueryAsync();
+                }
+
                 // ── IsDeleted: Ventas ─────────────────────────────────────────
                 command.CommandText = "PRAGMA table_info(Ventas);";
                 bool hasIsDeletedVentas = false;
@@ -261,6 +303,18 @@ namespace Sistema_de_Stock.Data
                     command.CommandText = "ALTER TABLE Productos ADD COLUMN PrecioCosto TEXT NOT NULL DEFAULT '0';";
                     await command.ExecuteNonQueryAsync();
                 }
+
+                // Crear tabla HistorialPrecios si no existe
+                command.CommandText = @"
+                    CREATE TABLE IF NOT EXISTS HistorialPrecios (
+                        Id TEXT PRIMARY KEY,
+                        ProductoId TEXT NOT NULL,
+                        ProductoNombre TEXT NOT NULL,
+                        FechaModificacion TEXT NOT NULL,
+                        PrecioAnterior TEXT NOT NULL,
+                        PrecioNuevo TEXT NOT NULL
+                    );";
+                await command.ExecuteNonQueryAsync();
             }
 
             if (wasClosed) await connection.CloseAsync();

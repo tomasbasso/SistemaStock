@@ -188,5 +188,45 @@ namespace Sistema_de_Stock.Models
 
         [MaxLength(50)]
         public string Telefono { get; set; } = string.Empty;
+
+        // Umbrales configurables para rotación y alertas
+        public decimal UmbralRotacionBaja { get; set; } = 1.0m;
+        public decimal UmbralRotacionMedia { get; set; } = 4.0m;
+        public int DiasAlertaSinVenta { get; set; } = 90;
+    }
+
+    public class HistorialPrecio
+    {
+        [Key]
+        public Guid Id { get; set; } = Guid.NewGuid();
+
+        [Required]
+        public Guid ProductoId { get; set; }
+
+        [Required]
+        [MaxLength(200)]
+        public string ProductoNombre { get; set; } = string.Empty;
+
+        public DateTime FechaModificacion { get; set; } = DateTime.Now;
+
+        public decimal PrecioAnterior { get; set; }
+        public decimal PrecioNuevo { get; set; }
+    }
+
+    public class RotacionProductoDto
+    {
+        public Guid ProductoId { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Categoria { get; set; } = string.Empty;
+        public int UnidadesVendidas12m { get; set; }
+        public decimal StockActual { get; set; }
+        public decimal Rotacion { get; set; }
+        public DateTime? UltimaVenta { get; set; }
+        public int DiasSinVenta { get; set; }
+        public decimal ValorInmovilizado { get; set; }
+        public decimal MargenUnitario { get; set; }
+        public string Tendencia { get; set; } = "→";
+        public string EstadoRotacion { get; set; } = "Sin rotación";
+        public string AccionSugerida { get; set; } = "";
     }
 }
