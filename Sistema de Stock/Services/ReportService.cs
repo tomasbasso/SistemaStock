@@ -148,5 +148,69 @@ namespace Sistema_de_Stock.Services
             workbook.SaveAs(stream);
             return stream.ToArray();
         }
+
+        public byte[] GenerateInventoryRotationReport(List<RotacionProductoDto> rotaciones)
+        {
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("Rotación");
+
+            // Encabezados
+            ws.Cell(1, 1).Value = "Producto";
+            ws.Cell(1, 2).Value = "Categoría";
+            ws.Cell(1, 3).Value = "Ventas 12m";
+            ws.Cell(1, 4).Value = "Stock";
+            ws.Cell(1, 5).Value = "Rotación";
+            ws.Cell(1, 6).Value = "Valor Inmovilizado";
+            ws.Cell(1, 7).Value = "Margen";
+            ws.Cell(1, 8).Value = "Tendencia";
+            ws.Cell(1, 9).Value = "Última Venta";
+            ws.Cell(1, 10).Value = "Días sin Venta";
+            ws.Cell(1, 11).Value = "Estado";
+            ws.Cell(1, 12).Value = "Acción Sugerida";
+
+            var headerRange = ws.Range("A1:L1");
+            headerRange.Style.Font.Bold = true;
+            headerRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#1d2442");
+            headerRange.Style.Font.FontColor = XLColor.White;
+
+            // Datos
+            int row = 2;
+            foreach (var r in rotaciones)
+            {
+                ws.Cell(row, 1).Value = r.Nombre;
+                ws.Cell(row, 2).Value = r.Categoria;
+                ws.Cell(row, 3).Value = r.UnidadesVendidas12m;
+                ws.Cell(row, 4).Value = r.StockActual;
+                ws.Cell(row, 5).Value = (double)r.Rotacion;
+                ws.Cell(row, 5).Style.NumberFormat.Format = "0.00";
+                ws.Cell(row, 6).Value = (double)r.ValorInmovilizado;
+                ws.Cell(row, 6).Style.NumberFormat.Format = "$ #,##0.00";
+                ws.Cell(row, 7).Value = (double)r.MargenUnitario;
+                ws.Cell(row, 7).Style.NumberFormat.Format = "0.0%";
+                ws.Cell(row, 8).Value = r.Tendencia;
+                ws.Cell(row, 9).Value = r.UltimaVenta.HasValue ? r.UltimaVenta.Value.ToString("dd/MM/yyyy") : "—";
+                ws.Cell(row, 10).Value = r.DiasSinVenta;
+                ws.Cell(row, 11).Value = r.EstadoRotacion;
+                ws.Cell(row, 12).Value = r.AccionSugerida;
+
+                // Color de fila por estado
+                var rowRange = ws.Range(row, 1, row, 12);
+                rowRange.Style.Fill.BackgroundColor = r.EstadoRotacion switch
+                {
+                    "Alta" => XLColor.FromHtml("#d4edda"),
+                    "Media" => XLColor.FromHtml("#cce5ff"),
+                    "Baja" => XLColor.FromHtml("#fff3cd"),
+                    _ => XLColor.FromHtml("#f8d7da")
+                };
+
+                row++;
+            }
+
+            ws.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
+        }
     }
 }

@@ -88,7 +88,7 @@
 
             <div class="flex flex-col sm:flex-row gap-4">
                 <button @onclick="ExportarBackup" disabled="@isBackuping" class="flex-1 bg-white/5 border border-white/10 hover:bg-[var(--color-primary)] text-white font-medium py-3 px-6 rounded-xl transition-all shadow-sm flex items-center justify-center gap-3">
-                    @if (isBackuping)
+                    @if (isBackuping && currentBackupAction == "export")
                     {
                         <i class="bi bi-arrow-repeat animate-spin"></i>
                         <span>Generando...</span>
@@ -100,8 +100,16 @@
                     }
                 </button>
                 <button @onclick="RestaurarBackup" disabled="@isBackuping" class="flex-1 bg-white/5 border border-white/10 hover:bg-[var(--color-warning)] text-white font-medium py-3 px-6 rounded-xl transition-all shadow-sm flex items-center justify-center gap-3">
-                    <i class="bi bi-cloud-upload"></i>
-                    <span>Restaurar Backup</span>
+                    @if (isBackuping && currentBackupAction == "restore")
+                    {
+                        <i class="bi bi-arrow-repeat animate-spin"></i>
+                        <span>Restaurando...</span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-cloud-upload"></i>
+                        <span>Restaurar Backup</span>
+                    }
                 </button>
             </div>
             
@@ -125,6 +133,7 @@
     // Backup vars
     private bool isBackuping = false;
     private string backupMessage = "";
+    private string currentBackupAction = "";
 
     protected override async Task OnInitializedAsync()
     {
@@ -166,6 +175,7 @@
     private async Task ExportarBackup()
     {
         isBackuping = true;
+        currentBackupAction = "export";
         backupMessage = "";
         StateHasChanged();
 
@@ -181,6 +191,7 @@
         }
 
         isBackuping = false;
+        currentBackupAction = "";
         StateHasChanged();
         
         // Hide message after a few seconds
@@ -195,14 +206,20 @@
     private async Task RestaurarBackup()
     {
         isBackuping = true;
+        currentBackupAction = "restore";
         backupMessage = "";
         StateHasChanged();
 
         var result = await Backup.RestoreBackupAsync();
         if (result.Success)
         {
-            backupMessage = "¡IMPORTANTE! Base de datos restaurada. CIERRA Y ABRE la aplicación para ver los nuevos datos.";
-            Notifications.Success("Base de datos restaurada.");
+            Notifications.Success("Base de datos restaurada. Cerrando la aplicación...");
+            backupMessage = "Backup restaurado. La aplicación se cerrará en 3 segundos para aplicar los cambios.";
+            StateHasChanged();
+            // Esperar un momento para que el usuario vea el mensaje
+            await Task.Delay(3000);
+            // Cerrar la app para que EF Core recargue la BD desde cero al reabrirla
+            Application.Current?.Quit();
         }
         else
         {
@@ -210,6 +227,7 @@
         }
 
         isBackuping = false;
+        currentBackupAction = "";
         StateHasChanged();
     }
 }

@@ -112,11 +112,21 @@
                     <h3 class="text-lg font-semibold text-white">Historial de Ventas</h3>
                     <p class="text-sm text-gray-400">Reimprimir remito de cualquier venta anterior</p>
                 </div>
-                <div class="relative w-64">
-                    <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
-                    <input type="text" @bind="ventaSearch" @bind:event="oninput"
-                           placeholder="Buscar N° o cliente..."
-                           class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+                <div class="flex items-center gap-3">
+                    <!-- Filtro de Fecha -->
+                    <select @onchange="OnRangeChange" class="bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all">
+                        <option value="all">Todo el historial</option>
+                        <option value="week">Última Semana</option>
+                        <option value="month">Último Mes</option>
+                    </select>
+
+                    <!-- Búsqueda -->
+                    <div class="relative w-64">
+                        <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                        <input type="text" @bind="ventaSearch" @bind:event="oninput"
+                               placeholder="Buscar N° o cliente..."
+                               class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+                    </div>
                 </div>
             </div>
 
@@ -126,7 +136,7 @@
                     <i class="bi bi-arrow-repeat animate-spin text-3xl text-gray-500"></i>
                 </div>
             }
-            else if (!ventasFiltradas.Any())
+            else if (totalVentas == 0)
             {
                 <div class="premium-card p-10 text-center text-gray-500">
                     <i class="bi bi-receipt text-4xl mb-3 block opacity-40"></i>
@@ -149,7 +159,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-white/5">
-                                @foreach (var v in ventasFiltradas)
+                                @foreach (var v in paginatedVentas)
                                 {
                                     var clienteName = GetClienteName(v.ClienteId);
                                     <tr class="hover:bg-white/5 transition-colors group">
@@ -197,6 +207,7 @@
                             </tbody>
                         </table>
                     </div>
+                    <AppPagination TotalItems="totalVentas" PageSize="@pageSize" CurrentPage="currentPage" OnPageChanged="HandlePageChange" />
                 </div>
             }
         </div>
@@ -211,24 +222,71 @@
     private string currentExport = "";
     private string successMessage = "";
     private string errorMessage = "";
-
-    private List<Venta> todasLasVentas = new();
+    private List<Venta> paginatedVentas = new();
     private List<Cliente> clientes = new();
-    private string ventaSearch = "";
-    private Guid? printingVentaId = null;
+    
+    // Paginación y Filtrado
+    private string _ventaSearch = "";
+    private System.Timers.Timer? searchTimer;
+    private string dateRange = "all";
+    private int currentPage = 1;
+    private int pageSize = 15;
+    private int totalVentas = 0;
 
-    private IEnumerable<Venta> ventasFiltradas => string.IsNullOrWhiteSpace(ventaSearch)
-        ? todasLasVentas
-        : todasLasVentas.Where(v =>
-            v.NumeroVenta.ToString().Contains(ventaSearch) ||
-            (v.ClienteId.HasValue && GetClienteName(v.ClienteId).Contains(ventaSearch, StringComparison.OrdinalIgnoreCase)));
+    private string ventaSearch 
+    {
+        get => _ventaSearch;
+        set 
+        {
+            if (_ventaSearch != value)
+            {
+                _ventaSearch = value;
+                if (searchTimer != null)
+                {
+                    searchTimer.Stop();
+                    searchTimer.Start();
+                }
+            }
+        }
+    }
+
+    private Guid? printingVentaId = null;
 
     protected override async Task OnInitializedAsync()
     {
+        searchTimer = new System.Timers.Timer(400);
+        searchTimer.Elapsed += async (s, e) => {
+            currentPage = 1;
+            await InvokeAsync(LoadCurrentPage);
+        };
+        searchTimer.AutoReset = false;
+
         isLoading = false;
         clientes = await Data.GetClientesAsync();
-        todasLasVentas = await Data.GetVentasAsync();
+        await LoadCurrentPage();
         isLoadingVentas = false;
+    }
+
+    private async Task LoadCurrentPage()
+    {
+        isLoadingVentas = true;
+        totalVentas = await Data.GetTotalVentasAsync(ventaSearch, dateRange);
+        paginatedVentas = await Data.GetVentasPaginadasAsync(currentPage, pageSize, ventaSearch, dateRange);
+        isLoadingVentas = false;
+        StateHasChanged();
+    }
+
+    private async Task HandlePageChange(int page)
+    {
+        currentPage = page;
+        await LoadCurrentPage();
+    }
+
+    private async Task OnRangeChange(ChangeEventArgs e)
+    {
+        dateRange = e.Value?.ToString() ?? "all";
+        currentPage = 1;
+        await LoadCurrentPage();
     }
 
     private string GetClienteName(Guid? clienteId)
@@ -329,9 +387,13 @@
             var categorias = await Data.GetCategoriasAsync();
             var bytes = Reports.GenerateInventoryReport(productos, categorias);
             string fileName = $"Reporte_Inventario_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
-            string path = GetDesktopPath(fileName);
-            await File.WriteAllBytesAsync(path, bytes);
-            _ = ShowSuccess(path);
+            using var stream = new MemoryStream(bytes);
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+            if (result.IsSuccessful)
+                Notifications.Success("Reporte de inventario guardado correctamente.");
+            else if (result.Exception != null)
+                ShowError("No se pudo guardar el archivo.");
         }
         catch (Exception ex)
         {
@@ -357,9 +419,13 @@
             var clientesList = await Data.GetClientesAsync();
             var bytes = Reports.GenerateSalesReport(ventas, clientesList);
             string fileName = $"Reporte_Ventas_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
-            string path = GetDesktopPath(fileName);
-            await File.WriteAllBytesAsync(path, bytes);
-            _ = ShowSuccess(path);
+            using var stream = new MemoryStream(bytes);
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+            if (result.IsSuccessful)
+                Notifications.Success("Reporte de ventas guardado correctamente.");
+            else if (result.Exception != null)
+                ShowError("No se pudo guardar el archivo.");
         }
         catch (Exception ex)
         {
@@ -384,9 +450,13 @@
             var movs = (await Data.GetMovimientosAsync()).ToList();
             var bytes = Reports.GenerateFinancialReport(movs);
             string fileName = $"Reporte_Finanzas_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
-            string path = GetDesktopPath(fileName);
-            await File.WriteAllBytesAsync(path, bytes);
-            _ = ShowSuccess(path);
+            using var stream = new MemoryStream(bytes);
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+            if (result.IsSuccessful)
+                Notifications.Success("Reporte financiero guardado correctamente.");
+            else if (result.Exception != null)
+                ShowError("No se pudo guardar el archivo.");
         }
         catch (Exception ex)
         {

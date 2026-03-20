@@ -68,6 +68,14 @@ namespace Sistema_de_Stock.Models
         [MaxLength(300, ErrorMessage = "La dirección no puede superar 300 caracteres.")]
         public string Address { get; set; } = string.Empty;
 
+        [MaxLength(13, ErrorMessage = "El CUIT no puede superar 13 caracteres.")]
+        [RegularExpression(@"^\d{2}-\d{8}-\d{1}$|^$", ErrorMessage = "Formato inválido. Use XX-XXXXXXXX-X.")]
+        public string CUIT { get; set; } = string.Empty;
+
+        [MaxLength(200, ErrorMessage = "El email no puede superar 200 caracteres.")]
+        [EmailAddress(ErrorMessage = "El email no es válido.")]
+        public string Email { get; set; } = string.Empty;
+
         public bool IsDeleted { get; set; } = false;
     }
 

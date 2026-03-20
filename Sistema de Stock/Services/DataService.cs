@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Sistema_de_Stock.Data;
 using Sistema_de_Stock.Models;
 using System;
@@ -341,6 +341,8 @@ namespace Sistema_de_Stock.Services
                 existing.Name = c.Name;
                 existing.Phone = c.Phone;
                 existing.Address = c.Address;
+                existing.CUIT = c.CUIT;
+                existing.Email = c.Email;
             }
             await _db.SaveChangesAsync();
         }
@@ -542,6 +544,53 @@ namespace Sistema_de_Stock.Services
 
         public async Task<List<Venta>> GetVentasAsync()
             => await _db.Ventas.OrderByDescending(v => v.Date).ToListAsync();
+
+        public async Task<int> GetTotalVentasAsync(string searchTerm = "", string range = "all")
+        {
+            var query = _db.Ventas.AsQueryable();
+            query = ApplyVentasFilters(query, searchTerm, range);
+            return await query.CountAsync();
+        }
+
+        public async Task<List<Venta>> GetVentasPaginadasAsync(int page, int pageSize, string searchTerm = "", string range = "all")
+        {
+            var query = _db.Ventas.AsQueryable();
+            query = ApplyVentasFilters(query, searchTerm, range);
+            
+            return await query
+                .OrderByDescending(v => v.Date)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+        }
+
+        private IQueryable<Venta> ApplyVentasFilters(IQueryable<Venta> query, string searchTerm, string range)
+        {
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                var term = searchTerm.ToLower();
+                
+                // Buscamos IDs de clientes que coincidan con el nombre
+                var clientIds = _db.Clientes
+                    .Where(c => c.Name.ToLower().Contains(term))
+                    .Select(c => c.Id);
+
+                query = query.Where(v => v.NumeroVenta.ToString().Contains(term) || (v.ClienteId.HasValue && clientIds.Contains(v.ClienteId.Value)));
+            }
+
+            if (range == "week")
+            {
+                var date = DateTime.Today.AddDays(-7);
+                query = query.Where(v => v.Date >= date);
+            }
+            else if (range == "month")
+            {
+                var date = DateTime.Today.AddMonths(-1);
+                query = query.Where(v => v.Date >= date);
+            }
+
+            return query;
+        }
 
         public async Task<List<VentaDetalle>> GetVentaDetallesAsync(Guid ventaId)
             => await _db.VentaDetalles.Where(d => d.VentaId == ventaId).ToListAsync();

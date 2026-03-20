@@ -66,6 +66,8 @@ namespace Sistema_de_Stock.Data
                 entity.Property(e => e.Name).IsRequired().HasMaxLength(200);
                 entity.Property(e => e.Phone).HasMaxLength(50);
                 entity.Property(e => e.Address).HasMaxLength(300);
+                entity.Property(e => e.CUIT).HasMaxLength(13);
+                entity.Property(e => e.Email).HasMaxLength(200);
             });
 
             // --- Cuentas Corrientes ---
@@ -301,6 +303,27 @@ namespace Sistema_de_Stock.Data
                 if (!hasPrecioCosto)
                 {
                     command.CommandText = "ALTER TABLE Productos ADD COLUMN PrecioCosto TEXT NOT NULL DEFAULT '0';";
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                // ── CUIT y Email: Clientes ───────────────────────────────────
+                command.CommandText = "PRAGMA table_info(Clientes);";
+                bool hasCUITClientes = false, hasEmailClientes = false;
+                using (var r = await command.ExecuteReaderAsync())
+                    while (await r.ReadAsync())
+                    {
+                        var col = r.GetString(1);
+                        if (string.Equals(col, "CUIT", StringComparison.OrdinalIgnoreCase)) hasCUITClientes = true;
+                        if (string.Equals(col, "Email", StringComparison.OrdinalIgnoreCase)) hasEmailClientes = true;
+                    }
+                if (!hasCUITClientes)
+                {
+                    command.CommandText = "ALTER TABLE Clientes ADD COLUMN CUIT TEXT NOT NULL DEFAULT '';";
+                    await command.ExecuteNonQueryAsync();
+                }
+                if (!hasEmailClientes)
+                {
+                    command.CommandText = "ALTER TABLE Clientes ADD COLUMN Email TEXT NOT NULL DEFAULT '';";
                     await command.ExecuteNonQueryAsync();
                 }
 

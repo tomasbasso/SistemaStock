@@ -38,6 +38,24 @@ namespace Sistema_de_Stock
             builder.Logging.AddDebug();
 #endif
 
+            // ── Configuración de Ventana (Pantalla Completa / Maximizado) ──
+            Microsoft.Maui.Handlers.WindowHandler.Mapper.AppendToMapping(nameof(IWindow), (handler, view) =>
+            {
+#if WINDOWS
+                var nativeWindow = handler.PlatformView;
+                nativeWindow.Activate();
+                IntPtr windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(nativeWindow);
+                Microsoft.UI.WindowId windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(windowHandle);
+                Microsoft.UI.Windowing.AppWindow appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+                
+                // Usar Maximized (O usar FullScreen para modo kiosco/F11)
+                if (appWindow.Presenter is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+                {
+                    presenter.Maximize();
+                }
+#endif
+            });
+
             return builder.Build();
         }
     }

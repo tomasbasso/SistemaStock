@@ -121,6 +121,10 @@ namespace Sistema_de_Stock.Services
                                         c.Item().Text($"Tel: {d.Cliente.Phone}").FontSize(9).FontColor("#475569");
                                     if (!string.IsNullOrEmpty(d.Cliente.Address))
                                         c.Item().Text($"Dir: {d.Cliente.Address}").FontSize(9).FontColor("#475569");
+                                    if (!string.IsNullOrEmpty(d.Cliente.CUIT))
+                                        c.Item().Text($"CUIT: {d.Cliente.CUIT}").FontSize(9).FontColor("#475569");
+                                    if (!string.IsNullOrEmpty(d.Cliente.Email))
+                                        c.Item().Text($"Email: {d.Cliente.Email}").FontSize(9).FontColor("#475569");
                                 });
 
                                 row.ConstantItem(160).Column(c =>
@@ -291,6 +295,8 @@ namespace Sistema_de_Stock.Services
                                         c.Item().Text($"Tel: {data.Cliente.Phone}").FontSize(8).FontColor("#475569");
                                     if (!string.IsNullOrEmpty(data.Cliente.Address))
                                         c.Item().Text($"Dir: {data.Cliente.Address}").FontSize(8).FontColor("#475569");
+                                    if (!string.IsNullOrEmpty(data.Cliente.CUIT))
+                                        c.Item().Text($"CUIT: {data.Cliente.CUIT}").FontSize(8).FontColor("#475569");
                                 });
                                 if (data.Venta.IsFiado)
                                     row.ConstantItem(80).AlignRight().AlignMiddle()

@@ -147,7 +147,11 @@
         
         <div class="bg-black/20 p-6 rounded-xl border border-white/5 text-center">
             <p class="text-sm text-gray-400 uppercase tracking-widest mb-2">Total a cobrar</p>
-            <h2 class="text-4xl font-bold text-[var(--color-secondary)]">@CartTotal.ToString("C")</h2>
+            @if (DiscountAmount > 0)
+            {
+                <p class="text-base line-through text-gray-600 mb-1">@CartTotal.ToString("C")</p>
+            }
+            <h2 class="text-4xl font-bold text-[var(--color-secondary)]">@FinalTotal.ToString("C")</h2>
         </div>
 
         <!-- Cliente Selection -->
@@ -187,6 +191,24 @@
                 <p class="text-[10px] text-[var(--color-danger)] mt-2">Debe seleccionar un cliente para vender de Fiado.</p>
                 // Auto reset if tricking UI
                 isFiado = false;
+            }
+        </div>
+
+        <!-- Descuento -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-2">Descuento <span class="text-gray-500 font-normal">(opcional)</span></label>
+            <div class="flex gap-3 items-center">
+                <div class="flex rounded-xl overflow-hidden border border-white/10">
+                    <button type="button" @onclick="SetDiscountPercent" class="@DiscountBtnClassPercent">%</button>
+                    <button type="button" @onclick="SetDiscountFixed" class="@DiscountBtnClassFixed">$</button>
+                </div>
+                <input type="number" step="0.01" min="0" @bind="discountValue" @bind:event="oninput"
+                       class="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] transition-all"
+                       placeholder="@DiscountPlaceholder" />
+            </div>
+            @if (DiscountAmount > 0)
+            {
+                <p class="text-xs text-[var(--color-success)] mt-1.5">Descuento aplicado: -@DiscountAmount.ToString("C")</p>
             }
         </div>
 
@@ -271,6 +293,24 @@
     private Guid selectedClienteId = Guid.Empty;
     private bool isFiado = false;
 
+    // Descuento
+    private string discountType = "%";
+    private decimal discountValue = 0;
+    private decimal DiscountAmount => discountType == "%"
+        ? Math.Round(CartTotal * Math.Clamp(discountValue, 0, 100) / 100, 2)
+        : Math.Clamp(discountValue, 0, CartTotal);
+    private decimal FinalTotal => CartTotal - DiscountAmount;
+
+    private void SetDiscountPercent() => discountType = "%";
+    private void SetDiscountFixed() => discountType = "$";
+    private string DiscountBtnClassPercent => discountType == "%"
+        ? "px-4 py-2 text-sm font-medium transition-colors bg-[var(--color-primary)] text-white"
+        : "px-4 py-2 text-sm font-medium transition-colors bg-black/20 text-gray-400 hover:text-white";
+    private string DiscountBtnClassFixed => discountType == "$"
+        ? "px-4 py-2 text-sm font-medium transition-colors bg-[var(--color-primary)] text-white"
+        : "px-4 py-2 text-sm font-medium transition-colors bg-black/20 text-gray-400 hover:text-white";
+    private string DiscountPlaceholder => discountType == "%" ? "Ej: 10" : "Ej: 500";
+
     // Datos de la última venta para el remito
     private int lastNumeroVenta = 0;
     private Venta? lastVenta;
@@ -336,6 +376,8 @@
     {
         selectedClienteId = Guid.Empty;
         isFiado = false;
+        discountValue = 0;
+        discountType = "%";
         isCheckoutModalOpen = true;
     }
 
@@ -349,7 +391,7 @@
         {
             var venta = new Venta
             {
-                Total = CartTotal,
+                Total = FinalTotal,
                 ClienteId = selectedClienteId == Guid.Empty ? null : selectedClienteId,
                 IsFiado = isFiado && selectedClienteId != Guid.Empty
             };

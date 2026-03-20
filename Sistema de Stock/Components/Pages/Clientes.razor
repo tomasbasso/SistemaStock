@@ -35,8 +35,25 @@
     }
     else
     {
+        <!-- Buscador -->
+        <div class="relative mb-6 max-w-md">
+            <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+            <input type="text" @bind="searchQuery" @bind:event="oninput"
+                   placeholder="Buscar por nombre, tel\u00e9fono o CUIT..."
+                   class="w-full bg-black/20 border border-white/10 rounded-xl pl-12 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+        </div>
+
+        @if (!FilteredItems.Any())
+        {
+            <div class="text-center py-16 text-gray-500">
+                <i class="bi bi-search text-3xl block mb-3 opacity-40"></i>
+                <p>No se encontraron clientes para "@searchQuery"</p>
+            </div>
+        }
+        else
+        {
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            @foreach (var item in items)
+            @foreach (var item in FilteredItems)
             {
                 <div class="premium-card p-6 flex flex-col justify-between group">
                     <div class="flex items-start justify-between">
@@ -70,12 +87,24 @@
                     
                     @if (!string.IsNullOrEmpty(item.Address))
                     {
-                        <div class="mt-4 text-sm text-gray-400">
+                        <div class="mt-3 text-sm text-gray-400">
                             <i class="bi bi-geo-alt mr-1"></i> @item.Address
                         </div>
                     }
+                    @if (!string.IsNullOrEmpty(item.CUIT))
+                    {
+                        <div class="mt-1 text-sm text-gray-400">
+                            <i class="bi bi-person-vcard mr-1"></i> CUIT: @item.CUIT
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(item.Email))
+                    {
+                        <div class="mt-1 text-sm text-gray-400">
+                            <i class="bi bi-envelope mr-1"></i> @item.Email
+                        </div>
+                    }
                     
-                    <div class="flex justify-end mt-4 pt-4 border-t border-white/5 gap-2">
+                    <div class="flex justify-end mt-4 pt-4 border-t border-white/5 gap-2 flex-wrap">
                         <button @onclick="() => OpenDetail(item, cc)" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] hover:brightness-110 text-white text-sm transition-colors flex items-center gap-2">
                             <i class="bi bi-file-earmark-text"></i>
                             Ver Detalle
@@ -84,16 +113,26 @@
                         {
                             <button @onclick="() => OpenSettleDebt(item, cc)" class="px-4 py-2 rounded-lg bg-[var(--color-success)] hover:brightness-110 text-white text-sm transition-colors flex items-center gap-2">
                                 <i class="bi bi-cash-coin"></i>
-                                Saladar Deuda
+                                Saldar Deuda
+                            </button>
+                        }
+                        @if (!string.IsNullOrEmpty(item.Phone))
+                        {
+                            <button @onclick="() => AbrirWhatsApp(item.Phone)" class="w-9 h-9 rounded-lg bg-[#25D366]/15 hover:bg-[#25D366]/30 text-[#25D366] transition-colors flex items-center justify-center" title="Abrir WhatsApp">
+                                <i class="bi bi-whatsapp"></i>
                             </button>
                         }
                         <button @onclick="() => OpenEdit(item)" class="w-9 h-9 rounded-lg bg-white/5 text-gray-300 hover:text-white hover:bg-[var(--color-primary)] transition-colors flex items-center justify-center">
                             <i class="bi bi-pencil"></i>
                         </button>
+                        <button @onclick="() => ConfirmDelete(item)" class="w-9 h-9 rounded-lg bg-white/5 text-[var(--color-danger)]/60 hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors flex items-center justify-center" title="Eliminar cliente">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
                 </div>
             }
         </div>
+        }
     }
 
 </div>
@@ -118,6 +157,16 @@
                 <InputText @bind-Value="editingItem.Address" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.Address" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">CUIT <span class="text-gray-500 font-normal">(XX-XXXXXXXX-X)</span></label>
+                <InputText @bind-Value="editingItem.CUIT" placeholder="20-12345678-9" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.CUIT" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <InputText @bind-Value="editingItem.Email" type="email" placeholder="cliente@ejemplo.com" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => editingItem.Email" class="text-[var(--color-danger)] text-xs mt-1 block" />
+            </div>
         </div>
         <div class="mt-8 flex justify-end gap-3">
             <button type="button" @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
@@ -139,6 +188,24 @@
     <div class="mt-6 flex justify-end gap-3">
         <button @onclick="() => isSettleModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
         <button @onclick="ConfirmPayment" disabled="@(paymentAmount <= 0 || paymentAmount > (settleCc?.Balance ?? 0))" class="px-5 py-2.5 rounded-xl bg-[var(--color-success)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50">Registrar Pago</button>
+    </div>
+</AppModal>
+
+<!-- Confirm Delete Modal -->
+<AppModal IsOpen="isConfirmDeleteOpen" IsOpenChanged="(v) => isConfirmDeleteOpen = v" Title="Confirmar Eliminación">
+    <div class="py-4 text-center">
+        <div class="w-16 h-16 rounded-full bg-[var(--color-danger)]/10 flex items-center justify-center mx-auto mb-4">
+            <i class="bi bi-exclamation-triangle-fill text-[var(--color-danger)] text-3xl"></i>
+        </div>
+        <p class="text-gray-300 mb-1">¿Estás seguro que querés eliminar al cliente</p>
+        <p class="text-white font-bold text-lg">@clienteToDelete?.Name</p>
+        <p class="text-xs text-gray-500 mt-2">Esta acción no se puede deshacer. Se eliminará también su cuenta corriente.</p>
+    </div>
+    <div class="mt-6 flex justify-end gap-3">
+        <button @onclick="() => isConfirmDeleteOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button @onclick="DeleteConfirmed" class="px-5 py-2.5 rounded-xl bg-[var(--color-danger)] hover:brightness-110 text-white transition-all font-medium flex items-center gap-2">
+            <i class="bi bi-trash"></i> Eliminar
+        </button>
     </div>
 </AppModal>
 
@@ -196,10 +263,22 @@
     private List<Cliente> items = new();
     private List<CuentaCorriente> cuentas = new();
     private bool isLoading = true;
-    
+    private string searchQuery = "";
+
+    private IEnumerable<Cliente> FilteredItems => string.IsNullOrWhiteSpace(searchQuery)
+        ? items
+        : items.Where(c =>
+            c.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+            (!string.IsNullOrEmpty(c.Phone) && c.Phone.Contains(searchQuery)) ||
+            (!string.IsNullOrEmpty(c.CUIT) && c.CUIT.Contains(searchQuery)));
+
     private bool isModalOpen = false;
     private bool isEditMode = false;
     private Cliente editingItem = new();
+
+    // Confirmación eliminar
+    private bool isConfirmDeleteOpen = false;
+    private Cliente? clienteToDelete;
     
     private bool isSettleModalOpen = false;
     private Cliente? settleClient;
@@ -226,6 +305,19 @@
         isLoading = false;
     }
 
+    private async Task AbrirWhatsApp(string phone)
+    {
+        // Limpiar el número: solo dígitos
+        var digits = new string(phone.Where(char.IsDigit).ToArray());
+
+        // Prefijo de Argentina (54) si no empieza con código internacional
+        if (!digits.StartsWith("54") && !digits.StartsWith("1"))
+            digits = "54" + digits;
+
+        var url = $"https://wa.me/{digits}";
+        await Launcher.OpenAsync(new Uri(url));
+    }
+
     private void OpenNew()
     {
         editingItem = new Cliente();
@@ -235,7 +327,7 @@
 
     private void OpenEdit(Cliente item)
     {
-        editingItem = new Cliente { Id = item.Id, Name = item.Name, Phone = item.Phone, Address = item.Address };
+        editingItem = new Cliente { Id = item.Id, Name = item.Name, Phone = item.Phone, Address = item.Address, CUIT = item.CUIT, Email = item.Email };
         isEditMode = true;
         isModalOpen = true;
     }
@@ -310,6 +402,29 @@
         isLoadingDetails = false;
     }
 
+    private void ConfirmDelete(Cliente item)
+    {
+        clienteToDelete = item;
+        isConfirmDeleteOpen = true;
+    }
+
+    private async Task DeleteConfirmed()
+    {
+        if (clienteToDelete == null) return;
+        try
+        {
+            await Data.DeleteClienteAsync(clienteToDelete.Id);
+            Notifications.Success($"Cliente '{clienteToDelete.Name}' eliminado.");
+            isConfirmDeleteOpen = false;
+            clienteToDelete = null;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al eliminar: {ex.Message}");
+        }
+    }
+
     private async Task ExportPdf()
     {
         if (detailClient == null || detailCc == null) return;
@@ -326,21 +441,12 @@
             };
             
             var bytes = Pdf.GenerarEstadoCuenta(data);
-            
-            string desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            string baseName = $"EstadoCuenta_{string.Join("_", detailClient.Name.Split(Path.GetInvalidFileNameChars()))}";
-            string fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
-            string path = System.IO.Path.Combine(desktopPath, fileName);
-            
-            int count = 1;
-            while (System.IO.File.Exists(path))
-            {
-                fileName = $"{baseName}_{DateTime.Now:yyyyMMdd_HHmm}({count++}).pdf";
-                path = System.IO.Path.Combine(desktopPath, fileName);
-            }
-            
-            await System.IO.File.WriteAllBytesAsync(path, bytes);
-            Notifications.Success($"PDF guardado en el Escritorio con éxito.");
+            string fileName = $"EstadoCuenta_{string.Concat(detailClient.Name.Split(Path.GetInvalidFileNameChars()))}_{DateTime.Now:yyyyMMdd_HHmm}.pdf";
+            using var stream = new MemoryStream(bytes);
+            var result = await MainThread.InvokeOnMainThreadAsync(async () =>
+                await CommunityToolkit.Maui.Storage.FileSaver.Default.SaveAsync(fileName, stream));
+            if (result.IsSuccessful)
+                Notifications.Success("PDF guardado correctamente.");
         }
         catch (Exception ex)
         {

@@ -29,15 +29,15 @@
     <!-- Summary KPIs -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div class="premium-card p-6 border-l-4 border-[var(--color-primary)]">
-            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Balance Neto</p>
+            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Balance Neto <span class="normal-case text-gray-600">(Histórico)</span></p>
             <h3 class="text-3xl font-bold text-white">@BalanceTotal.ToString("C")</h3>
         </div>
         <div class="premium-card p-6 border-l-4 border-[var(--color-success)]">
-            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Total Ingresos</p>
+            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Total Ingresos <span class="normal-case text-gray-600">(Histórico)</span></p>
             <h3 class="text-3xl font-bold text-[var(--color-success)]">@TotalIngresos.ToString("C")</h3>
         </div>
         <div class="premium-card p-6 border-l-4 border-[var(--color-danger)]">
-            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Total Egresos</p>
+            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Total Egresos <span class="normal-case text-gray-600">(Histórico)</span></p>
             <h3 class="text-3xl font-bold text-[var(--color-danger)]">@TotalEgresos.ToString("C")</h3>
         </div>
     </div>
