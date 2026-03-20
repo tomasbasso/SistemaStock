@@ -2,6 +2,7 @@
 @using Sistema_de_Stock.Services
 @using Sistema_de_Stock.Components.Shared
 @inject DataService Data
+@inject BackupService Backup
 
 <div class="min-h-screen bg-[var(--color-base)] text-white flex select-none">
 
@@ -77,5 +78,8 @@
     {
         var config = await Data.GetConfiguracionAsync();
         nombreNegocio = config?.NombreNegocio ?? "Sistema de Stock";
+
+        // Disparo en segundo plano para no bloquear la UI
+        _ = Task.Run(() => Backup.CheckAndRunAutoBackupAsync());
     }
 }

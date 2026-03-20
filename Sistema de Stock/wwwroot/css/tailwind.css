@@ -81,6 +81,8 @@
     --color-success-foreground: oklch(98% 0.01 160);
     --color-danger: oklch(60% 0.25 25);
     --color-warning: oklch(75% 0.18 85);
+    --color-secondary: oklch(72% 0.15 190);
+    --color-info: oklch(68% 0.15 240);
     --animate-fade-in: fade-in 0.3s ease-out;
   }
 }
@@ -1297,8 +1299,14 @@
   .border-gray-500 {
     border-color: var(--color-gray-500);
   }
+  .border-info {
+    border-color: var(--color-info);
+  }
   .border-primary {
     border-color: var(--color-primary);
+  }
+  .border-secondary {
+    border-color: var(--color-secondary);
   }
   .border-success {
     border-color: var(--color-success);
@@ -1354,6 +1362,12 @@
       background-color: color-mix(in oklab, var(--color-danger) 10%, transparent);
     }
   }
+  .bg-\[var\(--color-danger\)\]\/15 {
+    background-color: color-mix(in srgb, oklch(60% 0.25 25) 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-danger) 15%, transparent);
+    }
+  }
   .bg-\[var\(--color-danger\)\]\/20 {
     background-color: color-mix(in srgb, oklch(60% 0.25 25) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1399,6 +1413,12 @@
       background-color: color-mix(in oklab, var(--color-success) 10%, transparent);
     }
   }
+  .bg-\[var\(--color-success\)\]\/15 {
+    background-color: color-mix(in srgb, oklch(70% 0.18 160) 15%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-success) 15%, transparent);
+    }
+  }
   .bg-\[var\(--color-success\)\]\/20 {
     background-color: color-mix(in srgb, oklch(70% 0.18 160) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
@@ -1412,6 +1432,12 @@
     background-color: color-mix(in srgb, oklch(75% 0.18 85) 20%, transparent);
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-warning) 20%, transparent);
+    }
+  }
+  .bg-\[var\(--color-warning\)\]\/80 {
+    background-color: color-mix(in srgb, oklch(75% 0.18 85) 80%, transparent);
+    @supports (color: color-mix(in lab, red, red)) {
+      background-color: color-mix(in oklab, var(--color-warning) 80%, transparent);
     }
   }
   .bg-black {
@@ -1471,6 +1497,9 @@
       background-color: color-mix(in oklab, var(--color-green-500) 20%, transparent);
     }
   }
+  .bg-info {
+    background-color: var(--color-info);
+  }
   .bg-primary {
     background-color: var(--color-primary);
   }
@@ -1485,6 +1514,9 @@
     @supports (color: color-mix(in lab, red, red)) {
       background-color: color-mix(in oklab, var(--color-red-500) 15%, transparent);
     }
+  }
+  .bg-secondary {
+    background-color: var(--color-secondary);
   }
   .bg-success {
     background-color: var(--color-success);
@@ -1871,6 +1903,9 @@
       color: color-mix(in oklab, var(--color-danger) 70%, transparent);
     }
   }
+  .text-\[var\(--color-danger-foreground\)\] {
+    color: var(--color-danger-foreground);
+  }
   .text-\[var\(--color-primary\)\] {
     color: var(--color-primary);
   }
@@ -1928,6 +1963,9 @@
   .text-green-400 {
     color: var(--color-green-400);
   }
+  .text-info {
+    color: var(--color-info);
+  }
   .text-primary {
     color: var(--color-primary);
   }
@@ -1936,6 +1974,9 @@
   }
   .text-red-400 {
     color: var(--color-red-400);
+  }
+  .text-secondary {
+    color: var(--color-secondary);
   }
   .text-success {
     color: var(--color-success);
@@ -2131,7 +2172,7 @@
   .group-hover\:text-\[var\(--color-info\)\]\/10 {
     &:is(:where(.group):hover *) {
       @media (hover: hover) {
-        color: var(--color-info);
+        color: color-mix(in srgb, oklch(68% 0.15 240) 10%, transparent);
         @supports (color: color-mix(in lab, red, red)) {
           color: color-mix(in oklab, var(--color-info) 10%, transparent);
         }

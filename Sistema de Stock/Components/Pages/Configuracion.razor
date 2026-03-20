@@ -2,6 +2,11 @@
 @inject DataService Data
 @inject NotificationService Notifications
 @inject Sistema_de_Stock.Services.BackupService Backup
+@using CommunityToolkit.Maui.Storage
+@using Microsoft.Maui.ApplicationModel
+@using Microsoft.Maui.Storage
+@using Microsoft.Maui.Controls
+@using System.IO
 
 <div class="max-w-3xl">
     <div>
@@ -82,43 +87,66 @@
             </h3>
             
             <p class="text-gray-400 mb-6 text-sm">
-                Genera una copia de seguridad de todos los datos <b>(stock.db)</b> o restaura un respaldo previo. 
-                <i>Se recomienda hacer backups periódicos.</i>
+                Los respaldos se guardan en una carpeta local (por ejemplo, sincronizada con Google Drive Desktop) manteniendo los últimos 15 archivos. El sistema intentará uno automático cada 24h mientras la app esté abierta.
             </p>
 
-            <div class="flex flex-col sm:flex-row gap-4">
-                <button @onclick="ExportarBackup" disabled="@isBackuping" class="flex-1 bg-white/5 border border-white/10 hover:bg-[var(--color-primary)] text-white font-medium py-3 px-6 rounded-xl transition-all shadow-sm flex items-center justify-center gap-3">
-                    @if (isBackuping && currentBackupAction == "export")
-                    {
-                        <i class="bi bi-arrow-repeat animate-spin"></i>
-                        <span>Generando...</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-cloud-download"></i>
-                        <span>Exportar Backup</span>
-                    }
-                </button>
-                <button @onclick="RestaurarBackup" disabled="@isBackuping" class="flex-1 bg-white/5 border border-white/10 hover:bg-[var(--color-warning)] text-white font-medium py-3 px-6 rounded-xl transition-all shadow-sm flex items-center justify-center gap-3">
-                    @if (isBackuping && currentBackupAction == "restore")
-                    {
-                        <i class="bi bi-arrow-repeat animate-spin"></i>
-                        <span>Restaurando...</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-cloud-upload"></i>
-                        <span>Restaurar Backup</span>
-                    }
-                </button>
-            </div>
-            
-            @if (!string.IsNullOrEmpty(backupMessage))
-            {
-                <div class="mt-4 text-sm text-[var(--color-success)] py-2 border border-[var(--color-success)]/20 rounded-lg px-4 bg-[var(--color-success)]/10 text-center animate-fade-in">
-                    @backupMessage
+            <div class="grid gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Carpeta de respaldo</label>
+                    <div class="flex flex-col md:flex-row gap-3">
+                        <input type="text" class="flex-1 bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white text-sm" value="@selectedFolderDisplay" readonly />
+                        <button type="button" class="bg-white/10 hover:bg-white/20 border border-white/10 text-white font-medium px-4 py-3 rounded-xl transition-all flex items-center gap-2" @onclick="SeleccionarCarpeta">
+                            <i class="bi bi-folder2-open"></i>
+                            <span>Seleccionar Carpeta</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Se recomienda elegir una carpeta sincronizada por Google Drive Desktop.</p>
                 </div>
-            }
+
+                <div class="flex items-center gap-2 text-sm text-gray-300">
+                    <i class="bi bi-clock-history text-[var(--color-primary)]"></i>
+                    <span>Último respaldo histórico: <strong>@lastBackupText</strong></span>
+                </div>
+                <div class="flex items-center gap-2 text-sm text-gray-300">
+                    <i class="bi bi-calendar-check text-[var(--color-success)]"></i>
+                    <span>Último backup de cierre: <strong>@lastClosingBackupText</strong></span>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button type="button" class="flex-1 bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" @onclick="RespaldarAhora" disabled="@(!canBackup || isBackingUp || isRestoring)">
+                        @if (isBackingUp)
+                        {
+                            <i class="bi bi-arrow-repeat animate-spin"></i>
+                            <span>Generando respaldo...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-hdd-network"></i>
+                            <span>Respaldar ahora</span>
+                        }
+                    </button>
+                    <button type="button" class="flex-1 bg-[var(--color-warning)]/80 hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" @onclick="RestaurarBackup" disabled="@isRestoring">
+                        @if (isRestoring)
+                        {
+                            <i class="bi bi-arrow-repeat animate-spin"></i>
+                            <span>Restaurando...</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-arrow-counterclockwise"></i>
+                            <span>Restaurar backup</span>
+                        }
+                    </button>
+                </div>
+
+                @if (!string.IsNullOrEmpty(alertMessage))
+                {
+                    <div class="@alertCss">
+                        <i class="@alertIcon"></i>
+                        <span>@alertMessage</span>
+                    </div>
+                }
+            </div>
         </div>
     }
 
@@ -130,14 +158,24 @@
     private bool isSaving = false;
     private bool showSuccessMessage = false;
 
-    // Backup vars
-    private bool isBackuping = false;
-    private string backupMessage = "";
-    private string currentBackupAction = "";
+    // Backup UI state
+    private string selectedFolder = "";
+    private string selectedFolderDisplay = "Sin carpeta seleccionada";
+    private DateTime? lastBackupUtc = null;
+    private string lastBackupText = "Nunca";
+    private DateTime? lastClosingBackupUtc = null;
+    private string lastClosingBackupText = "Nunca";
+    private bool isBackingUp = false;
+    private bool isRestoring = false;
+    private string alertMessage = "";
+    private string alertCss = "";
+    private string alertIcon = "";
+    private bool canBackup => !string.IsNullOrWhiteSpace(selectedFolder) && Directory.Exists(selectedFolder);
 
     protected override async Task OnInitializedAsync()
     {
         await LoadConfig();
+        LoadBackupState();
     }
 
     private async Task LoadConfig()
@@ -172,62 +210,113 @@
         }
     }
 
-    private async Task ExportarBackup()
+    private void LoadBackupState()
     {
-        isBackuping = true;
-        currentBackupAction = "export";
-        backupMessage = "";
+        selectedFolder = Backup.GetConfiguredFolder() ?? string.Empty;
+        selectedFolderDisplay = string.IsNullOrWhiteSpace(selectedFolder) ? "Sin carpeta seleccionada" : selectedFolder;
+
+        lastBackupUtc = Backup.GetLastBackupUtc();
+        lastBackupText = lastBackupUtc.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(lastBackupUtc.Value, TimeZoneInfo.Local).ToString("dd/MM/yyyy HH:mm")
+            : "Nunca";
+
+        lastClosingBackupUtc = Backup.GetLastClosingBackupUtc();
+        lastClosingBackupText = lastClosingBackupUtc.HasValue
+            ? TimeZoneInfo.ConvertTimeFromUtc(lastClosingBackupUtc.Value, TimeZoneInfo.Local).ToString("dd/MM/yyyy HH:mm")
+            : "Nunca";
+    }
+
+    private async Task SeleccionarCarpeta()
+    {
+        try
+        {
+            var pickResult = await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                return await FolderPicker.Default.PickAsync("Seleccione carpeta de respaldo");
+            });
+
+            if (pickResult == null || string.IsNullOrWhiteSpace(pickResult.Folder?.Path))
+                return;
+
+            selectedFolder = pickResult.Folder.Path;
+            selectedFolderDisplay = selectedFolder;
+
+            Preferences.Set("Backup.TargetFolder", selectedFolder);
+            alertMessage = "";
+
+            Notifications.Success("Carpeta de respaldo guardada.");
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"No se pudo seleccionar la carpeta: {ex.Message}");
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RespaldarAhora()
+    {
+        if (!canBackup)
+        {
+            Notifications.Warning("Configura primero una carpeta de respaldo.");
+            return;
+        }
+
+        isBackingUp = true;
+        alertMessage = "";
         StateHasChanged();
 
-        var result = await Backup.ExportBackupAsync();
+        var result = await Backup.ExecuteBackupToFolderAsync(selectedFolder, isAutomatic: false);
+
+        isBackingUp = false;
+
         if (result.Success)
         {
-            backupMessage = "¡Respaldo exportado exitosamente!";
-            Notifications.Success("Backup generado.");
+            Notifications.Success("Backup creado correctamente.");
+            lastBackupUtc = DateTime.UtcNow;
+            lastBackupText = TimeZoneInfo.ConvertTimeFromUtc(lastBackupUtc.Value, TimeZoneInfo.Local).ToString("dd/MM/yyyy HH:mm");
+            alertMessage = "Backup generado y guardado en la carpeta configurada.";
+            alertCss = "mt-2 p-3 rounded-lg bg-[var(--color-success)]/15 border border-[var(--color-success)]/30 text-[var(--color-success-foreground)] flex items-center gap-2";
+            alertIcon = "bi bi-check-circle-fill";
         }
         else
         {
             Notifications.Error(result.Message);
+            alertMessage = result.Message;
+            alertCss = "mt-2 p-3 rounded-lg bg-[var(--color-danger)]/15 border border-[var(--color-danger)]/30 text-[var(--color-danger-foreground)] flex items-center gap-2";
+            alertIcon = "bi bi-exclamation-triangle-fill";
         }
 
-        isBackuping = false;
-        currentBackupAction = "";
         StateHasChanged();
-        
-        // Hide message after a few seconds
-        if (result.Success)
-        {
-            await Task.Delay(3000);
-            backupMessage = "";
-            await InvokeAsync(StateHasChanged);
-        }
     }
 
     private async Task RestaurarBackup()
     {
-        isBackuping = true;
-        currentBackupAction = "restore";
-        backupMessage = "";
+        isRestoring = true;
+        alertMessage = "";
         StateHasChanged();
 
         var result = await Backup.RestoreBackupAsync();
+
         if (result.Success)
         {
+            alertMessage = "Backup restaurado. La aplicación se cerrará en 3 segundos; si no se cierra (Android), reabrila manualmente.";
+            alertCss = "mt-2 p-3 rounded-lg bg-[var(--color-success)]/15 border border-[var(--color-success)]/30 text-[var(--color-success-foreground)] flex items-center gap-2";
+            alertIcon = "bi bi-check-circle-fill";
             Notifications.Success("Base de datos restaurada. Cerrando la aplicación...");
-            backupMessage = "Backup restaurado. La aplicación se cerrará en 3 segundos para aplicar los cambios.";
             StateHasChanged();
-            // Esperar un momento para que el usuario vea el mensaje
             await Task.Delay(3000);
-            // Cerrar la app para que EF Core recargue la BD desde cero al reabrirla
             Application.Current?.Quit();
         }
         else
         {
+            alertMessage = result.Message;
+            alertCss = "mt-2 p-3 rounded-lg bg-[var(--color-danger)]/15 border border-[var(--color-danger)]/30 text-[var(--color-danger-foreground)] flex items-center gap-2";
+            alertIcon = "bi bi-exclamation-triangle-fill";
             Notifications.Error($"Error al restaurar: {result.Message}");
         }
 
-        isBackuping = false;
-        currentBackupAction = "";
+        isRestoring = false;
         StateHasChanged();
     }
 }

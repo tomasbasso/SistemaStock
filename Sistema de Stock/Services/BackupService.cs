@@ -1,13 +1,20 @@
 using CommunityToolkit.Maui.Storage;
 using Sistema_de_Stock.Data;
 using Sistema_de_Stock.Models;
+using Microsoft.Maui.Storage;
 using System.IO;
+using System.Globalization;
+using System.Linq;
 
 namespace Sistema_de_Stock.Services
 {
-    public class BackupService
+    public partial class BackupService
     {
         private readonly string _dbPath;
+        private const string TargetFolderKey = "Backup.TargetFolder";
+        private const string LastRunUtcKey = "Backup.LastRunUtc";
+        private const string LastCloseUtcKey = "Backup.LastCloseUtc";
+        private const int RetentionCount = 15;
 
         public BackupService()
         {
@@ -151,6 +158,11 @@ namespace Sistema_de_Stock.Services
                         if (File.Exists(walPath)) File.Delete(walPath);
                         if (File.Exists(shmPath)) File.Delete(shmPath);
 
+                        // Validar el backup antes de sobrescribir
+                        var validateResult = await ValidateBackupFileAsync(tempPath);
+                        if (!validateResult.Success)
+                            return validateResult;
+
                         // Sobrescribir base de datos principal
                         File.Copy(tempPath, _dbPath, overwrite: true);
                         success = true;
@@ -185,6 +197,239 @@ namespace Sistema_de_Stock.Services
             {
                 return Result<string>.Fail($"Error al restaurar: {ex.Message}");
             }
+        }
+
+        private async Task<Result<string>> ValidateBackupFileAsync(string dbPath)
+        {
+            try
+            {
+                using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath}");
+                await conn.OpenAsync();
+
+                var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name='Configuraciones' LIMIT 1;";
+                var result = await cmd.ExecuteScalarAsync();
+                if (result == null || result == DBNull.Value)
+                    return Result<string>.Fail("El archivo seleccionado no parece ser un respaldo vÃ¡lido (falta la tabla Configuraciones).");
+
+                return Result<string>.Ok("Backup vÃ¡lido");
+            }
+            catch (Exception ex)
+            {
+                return Result<string>.Fail($"No se pudo validar el respaldo: {ex.Message}");
+            }
+            finally
+            {
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+            }
+        }
+    }
+
+    // Nuevas APIs de respaldo hÃ­brido (manual/automÃ¡tico)
+    public partial class BackupService
+    {
+        public async Task<Result<string>> ExecuteBackupToFolderAsync(string targetFolder, bool isAutomatic)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(targetFolder) || !Directory.Exists(targetFolder))
+                    return Result<string>.Fail("La carpeta de destino no es vÃ¡lida.");
+
+                if (!File.Exists(_dbPath))
+                    return Result<string>.Fail("No se encontrÃ³ el archivo de base de datos.");
+
+                // Limpieza agresiva para evitar locks en Windows
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+                var tempBackupPath = Path.Combine(FileSystem.CacheDirectory, $"Backup_Temp_{Guid.NewGuid()}.db");
+
+                try
+                {
+                    using (var sourceConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_dbPath}"))
+                    using (var destinationConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={tempBackupPath}"))
+                    {
+                        await sourceConnection.OpenAsync();
+                        await destinationConnection.OpenAsync();
+
+                        sourceConnection.BackupDatabase(destinationConnection);
+
+                        await destinationConnection.CloseAsync();
+                        await sourceConnection.CloseAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return Result<string>.Fail($"Error al generar backup: {ex.Message}");
+                }
+                finally
+                {
+                    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                }
+
+                var fileName = $"Backup_Stock_{DateTime.Now:yyyyMMdd_HHmm}.db";
+                var destinationPath = Path.Combine(targetFolder, fileName);
+
+                try
+                {
+                    Directory.CreateDirectory(targetFolder);
+                    File.Copy(tempBackupPath, destinationPath, overwrite: true);
+                }
+                finally
+                {
+                    if (File.Exists(tempBackupPath))
+                    {
+                        try { File.Delete(tempBackupPath); } catch { /* ignore */ }
+                    }
+                }
+
+                // Actualizar preferencias
+                Preferences.Set(TargetFolderKey, targetFolder);
+                Preferences.Set(LastRunUtcKey, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+
+                // RetenciÃ³n: mantener Ãºltimos 15 backups
+                try
+                {
+                    var files = Directory.EnumerateFiles(targetFolder, "Backup_Stock_*.db")
+                        .Select(path => new FileInfo(path))
+                        .OrderByDescending(f => f.CreationTimeUtc)
+                        .ToList();
+
+                    if (files.Count > RetentionCount)
+                    {
+                        foreach (var file in files.Skip(RetentionCount))
+                        {
+                            try { file.Delete(); } catch { /* ignore */ }
+                        }
+                    }
+                }
+                catch
+                {
+                    // Ignorar errores de limpieza de retenciÃ³n para no fallar el backup principal
+                }
+
+                var prefix = isAutomatic ? "automÃ¡tico" : "manual";
+                return Result<string>.Ok($"Backup {prefix} creado en {destinationPath}");
+            }
+            catch (Exception ex)
+            {
+                return Result<string>.Fail($"Error general al respaldar: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<string>> ExecuteClosingBackupAsync(string targetFolder)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(targetFolder) || !Directory.Exists(targetFolder))
+                    return Result<string>.Fail("No hay carpeta configurada para el backup de cierre.");
+
+                if (!File.Exists(_dbPath))
+                    return Result<string>.Fail("No se encontrÃ³ el archivo de base de datos.");
+
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+                var tempBackupPath = Path.Combine(FileSystem.CacheDirectory, $"Backup_Cierre_{Guid.NewGuid()}.db");
+
+                try
+                {
+                    using (var sourceConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_dbPath}"))
+                    using (var destinationConnection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={tempBackupPath}"))
+                    {
+                        await sourceConnection.OpenAsync();
+                        await destinationConnection.OpenAsync();
+
+                        sourceConnection.BackupDatabase(destinationConnection);
+
+                        await destinationConnection.CloseAsync();
+                        await sourceConnection.CloseAsync();
+                    }
+                }
+                finally
+                {
+                    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                }
+
+                var destinationPath = Path.Combine(targetFolder, "Backup_Stock_UltimoCierre.db");
+
+                try
+                {
+                    Directory.CreateDirectory(targetFolder);
+                    File.Copy(tempBackupPath, destinationPath, overwrite: true);
+                }
+                finally
+                {
+                    if (File.Exists(tempBackupPath))
+                    {
+                        try { File.Delete(tempBackupPath); } catch { /* ignore */ }
+                    }
+                }
+
+                Preferences.Set(TargetFolderKey, targetFolder);
+                Preferences.Set(LastCloseUtcKey, DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+
+                return Result<string>.Ok("Backup de cierre creado correctamente.");
+            }
+            catch (Exception ex)
+            {
+                return Result<string>.Fail($"Error en el backup de cierre: {ex.Message}");
+            }
+        }
+
+        public async Task<Result<string>> CheckAndRunAutoBackupAsync()
+        {
+            try
+            {
+                var folder = Preferences.Get(TargetFolderKey, string.Empty);
+                if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+                    return Result<string>.Fail("No hay carpeta configurada para respaldos automÃ¡ticos.");
+
+                var lastRunString = Preferences.Get(LastRunUtcKey, string.Empty);
+                DateTime lastRunUtc = DateTime.MinValue;
+
+                if (!string.IsNullOrWhiteSpace(lastRunString))
+                    DateTime.TryParse(lastRunString, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out lastRunUtc);
+
+                var elapsed = DateTime.UtcNow - lastRunUtc;
+                if (elapsed < TimeSpan.FromHours(24))
+                    return Result<string>.Ok("AÃºn no pasaron 24 horas desde el Ãºltimo respaldo automÃ¡tico.");
+
+                return await ExecuteBackupToFolderAsync(folder, isAutomatic: true);
+            }
+            catch (Exception ex)
+            {
+                return Result<string>.Fail($"Error al verificar respaldo automÃ¡tico: {ex.Message}");
+            }
+        }
+
+        // Helpers para UI (opcionalmente pÃºblicos)
+        public string? GetConfiguredFolder() => Preferences.Get(TargetFolderKey, string.Empty);
+
+        public DateTime? GetLastBackupUtc()
+        {
+            var lastRunString = Preferences.Get(LastRunUtcKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(lastRunString)) return null;
+            if (DateTime.TryParse(lastRunString, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var dt))
+                return dt;
+            return null;
+        }
+
+        public DateTime? GetLastClosingBackupUtc()
+        {
+            var lastCloseString = Preferences.Get(LastCloseUtcKey, string.Empty);
+            if (string.IsNullOrWhiteSpace(lastCloseString)) return null;
+            if (DateTime.TryParse(lastCloseString, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal, out var dt))
+                return dt;
+            return null;
         }
     }
 }

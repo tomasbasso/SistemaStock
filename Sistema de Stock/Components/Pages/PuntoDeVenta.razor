@@ -157,7 +157,7 @@
         <!-- Cliente Selection -->
         <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Cliente (Opcional)</label>
-            <select @bind="selectedClienteId" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all">
+            <select @bind="selectedClienteId" @bind:after="OnClienteChanged" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all">
                 <option value="@Guid.Empty" class="bg-[#161b27] text-white">Consumidor Final</option>
                 @foreach(var c in clientes)
                 {
@@ -189,8 +189,6 @@
             @if(selectedClienteId == Guid.Empty && isFiado)
             {
                 <p class="text-[10px] text-[var(--color-danger)] mt-2">Debe seleccionar un cliente para vender de Fiado.</p>
-                // Auto reset if tricking UI
-                isFiado = false;
             }
         </div>
 
@@ -370,6 +368,12 @@
     private void ClearCart()
     {
         cartItems.Clear();
+    }
+
+    private void OnClienteChanged()
+    {
+        if (selectedClienteId == Guid.Empty)
+            isFiado = false;
     }
 
     private void OpenCheckout()

@@ -346,6 +346,23 @@ namespace Sistema_de_Stock.Services
                             }
                         });
 
+                        // Mostrar descuento si el total cobrado difiere del subtotal de los ítems
+                        var subtotalItems = data.Detalles.Sum(d => d.UnitPrice * d.Quantity);
+                        var descuento = subtotalItems - data.Venta.Total;
+                        if (descuento > 0)
+                        {
+                            col.Item().PaddingTop(2).Background("#f1f5f9").Padding(8).Row(row =>
+                            {
+                                row.RelativeItem().Text("Subtotal").FontSize(9).FontColor("#334155");
+                                row.ConstantItem(90).AlignRight().Text($"{subtotalItems:C}").FontSize(9).FontColor("#334155");
+                            });
+                            col.Item().Background("#fef9c3").Padding(8).Row(row =>
+                            {
+                                row.RelativeItem().Text("Descuento").FontSize(9).FontColor("#854d0e");
+                                row.ConstantItem(90).AlignRight().Text($"-{descuento:C}").FontSize(9).Bold().FontColor("#854d0e");
+                            });
+                        }
+
                         col.Item().PaddingTop(4).Background("#1e293b").Padding(10).Row(row =>
                         {
                             row.RelativeItem().Text(data.Venta.IsFiado ? "TOTAL  (Cuenta Corriente)" : "TOTAL  (Contado)").FontSize(10).Bold().FontColor("#ffffff");

@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Sistema_de_Stock.Data;
 using CommunityToolkit.Maui;
+using Sistema_de_Stock.Data;
+using Sistema_de_Stock.Services;
+using Microsoft.Maui.LifecycleEvents;
+using Microsoft.Maui.Storage;
+using Microsoft.Maui;
 
 namespace Sistema_de_Stock
 {
@@ -53,6 +57,49 @@ namespace Sistema_de_Stock
                 {
                     presenter.Maximize();
                 }
+#endif
+            });
+
+            // Backup de cierre silencioso
+            builder.ConfigureLifecycleEvents(events =>
+            {
+#if ANDROID
+                events.AddAndroid(android => android.OnStop(activity =>
+                {
+                    var folder = Preferences.Get("Backup.TargetFolder", string.Empty);
+                    if (string.IsNullOrWhiteSpace(folder)) return;
+
+                    var services = IPlatformApplication.Current?.Services;
+                    var backup = services?.GetService<BackupService>();
+                    if (backup == null) return;
+
+                    _ = Task.Run(async () =>
+                    {
+                        try { await backup.ExecuteClosingBackupAsync(folder); }
+                        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Backup cierre Android] {ex.Message}"); }
+                    });
+                }));
+#endif
+
+#if WINDOWS
+                events.AddWindows(windows => windows.OnWindowCreated(window =>
+                {
+                    window.Closed += (_, __) =>
+                    {
+                        var folder = Preferences.Get("Backup.TargetFolder", string.Empty);
+                        if (string.IsNullOrWhiteSpace(folder)) return;
+
+                        var services = IPlatformApplication.Current?.Services;
+                        var backup = services?.GetService<BackupService>();
+                        if (backup == null) return;
+
+                        _ = Task.Run(async () =>
+                        {
+                            try { await backup.ExecuteClosingBackupAsync(folder); }
+                            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[Backup cierre Windows] {ex.Message}"); }
+                        });
+                    };
+                }));
 #endif
             });
 

@@ -62,6 +62,9 @@ namespace Sistema_de_Stock.Services
                 existing.Moneda = config.Moneda;
                 existing.DireccionNegocio = config.DireccionNegocio;
                 existing.Telefono = config.Telefono;
+                existing.UmbralRotacionBaja = config.UmbralRotacionBaja;
+                existing.UmbralRotacionMedia = config.UmbralRotacionMedia;
+                existing.DiasAlertaSinVenta = config.DiasAlertaSinVenta;
             }
             await _db.SaveChangesAsync();
         }
