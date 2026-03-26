@@ -332,6 +332,11 @@ namespace Sistema_de_Stock.Services
 
         public async Task SaveClienteAsync(Cliente c)
         {
+            c.Phone ??= string.Empty;
+            c.Address ??= string.Empty;
+            c.CUIT ??= string.Empty;
+            c.Email ??= string.Empty;
+
             var existing = await _db.Clientes.FindAsync(c.Id);
             if (existing == null)
             {

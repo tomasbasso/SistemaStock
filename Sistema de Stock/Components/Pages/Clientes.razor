@@ -148,22 +148,22 @@
                 <ValidationMessage For="() => editingItem.Name" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Teléfono</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Teléfono <span class="text-gray-500 font-normal">(Opcional)</span></label>
                 <InputText @bind-Value="editingItem.Phone" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.Phone" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Dirección</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Dirección <span class="text-gray-500 font-normal">(Opcional)</span></label>
                 <InputText @bind-Value="editingItem.Address" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.Address" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">CUIT <span class="text-gray-500 font-normal">(XX-XXXXXXXX-X)</span></label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">CUIT <span class="text-gray-500 font-normal">(Opcional, XX-XXXXXXXX-X)</span></label>
                 <InputText @bind-Value="editingItem.CUIT" placeholder="20-12345678-9" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.CUIT" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Email <span class="text-gray-500 font-normal">(Opcional)</span></label>
                 <InputText @bind-Value="editingItem.Email" type="email" placeholder="cliente@ejemplo.com" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
                 <ValidationMessage For="() => editingItem.Email" class="text-[var(--color-danger)] text-xs mt-1 block" />
             </div>

@@ -25,32 +25,37 @@
     else
     {
         <div class="premium-card p-8">
-            <form @onsubmit="SaveConfig">
+            <EditForm Model="config" OnValidSubmit="SaveConfig">
+                <DataAnnotationsValidator />
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     
                     <!-- Nombre Negocio -->
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Nombre del Negocio</label>
-                        <input type="text" @bind="config.NombreNegocio" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" required />
+                        <InputText @bind-Value="config.NombreNegocio" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <ValidationMessage For="() => config.NombreNegocio" class="text-[var(--color-danger)] text-sm mt-1" />
                     </div>
 
                     <!-- Moneda -->
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Moneda (Símbolo)</label>
-                        <input type="text" @bind="config.Moneda" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" required />
+                        <InputText @bind-Value="config.Moneda" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <ValidationMessage For="() => config.Moneda" class="text-[var(--color-danger)] text-sm mt-1" />
                     </div>
 
                     <!-- Teléfono -->
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Teléfono</label>
-                        <input type="text" @bind="config.Telefono" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <InputText @bind-Value="config.Telefono" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <ValidationMessage For="() => config.Telefono" class="text-[var(--color-danger)] text-sm mt-1" />
                     </div>
 
                     <!-- Dirección -->
                     <div class="md:col-span-2">
                         <label class="block text-sm font-medium text-gray-300 mb-2">Dirección Completa</label>
-                        <input type="text" @bind="config.DireccionNegocio" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <InputText @bind-Value="config.DireccionNegocio" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)] transition-all" />
+                        <ValidationMessage For="() => config.DireccionNegocio" class="text-[var(--color-danger)] text-sm mt-1" />
                     </div>
 
                 </div>
@@ -69,7 +74,7 @@
                         }
                     </button>
                 </div>
-            </form>
+            </EditForm>
 
             @if (showSuccessMessage)
             {

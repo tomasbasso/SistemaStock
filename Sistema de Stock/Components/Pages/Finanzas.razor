@@ -116,23 +116,28 @@
 
 <!-- Form Modal -->
 <AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="@(nuevaTransaccion.Type == TipoMovimiento.Ingreso ? "Registrar Ingreso" : "Registrar Egreso")">
-    <div class="space-y-4">
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Concepto / Descripción *</label>
-            <input type="text" @bind="nuevaTransaccion.Description" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" placeholder="Ej: Pago de luz, Aporte de capital..." />
+    <EditForm Model="nuevaTransaccion" OnValidSubmit="Save">
+        <DataAnnotationsValidator />
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Concepto / Descripción *</label>
+                <InputText @bind-Value="nuevaTransaccion.Description" autofocus class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" placeholder="Ej: Pago de luz, Aporte de capital..." />
+                <ValidationMessage For="() => nuevaTransaccion.Description" class="text-[var(--color-danger)] text-sm mt-1" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Monto *</label>
+                <InputNumber @bind-Value="nuevaTransaccion.Amount" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+                <ValidationMessage For="() => nuevaTransaccion.Amount" class="text-[var(--color-danger)] text-sm mt-1" />
+            </div>
         </div>
-        <div>
-            <label class="block text-sm font-medium text-gray-300 mb-1">Monto *</label>
-            <input type="number" step="0.01" min="0.01" @bind="nuevaTransaccion.Amount" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]" />
+        
+        <div class="mt-8 flex justify-end gap-3">
+            <button type="button" @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+            <button type="submit" class="px-5 py-2.5 rounded-xl @(nuevaTransaccion.Type == TipoMovimiento.Ingreso ? "bg-[var(--color-success)]" : "bg-[var(--color-danger)]") hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                Guardar
+            </button>
         </div>
-    </div>
-    
-    <div class="mt-8 flex justify-end gap-3">
-        <button @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
-        <button @onclick="Save" disabled="@(string.IsNullOrWhiteSpace(nuevaTransaccion.Description) || nuevaTransaccion.Amount <= 0)" class="px-5 py-2.5 rounded-xl @(nuevaTransaccion.Type == TipoMovimiento.Ingreso ? "bg-[var(--color-success)]" : "bg-[var(--color-danger)]") hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-            Guardar
-        </button>
-    </div>
+    </EditForm>
 </AppModal>
 
 @code {

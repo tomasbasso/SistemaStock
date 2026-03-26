@@ -1,0 +1,29 @@
+# OpenSpec Project Configuration
+# Sistema de Stock - Inventory Management System
+
+project:
+  name: Sistema de Stock
+  type: .NET 8 MAUI + Blazor Hybrid
+  description: Hybrid offline inventory management system for Argentine businesses
+
+stack:
+  - .NET 8.0
+  - MAUI (Windows, Android)
+  - Blazor WebView
+  - SQLite + EF Core
+  - Tailwind CSS v4
+  - QuestPDF
+  - ClosedXML
+
+conventions:
+  - soft-deletes: true
+  - decimal-as-text: true
+  - Result pattern: Result<T>.Ok() / Result<T>.Fail()
+  - decimal storage: HasColumnType("TEXT") required
+
+skills:
+  path: .agents/skills/
+  registry: .atl/skill-registry.md
+
+artifact_store:
+  mode: hybrid  # engram + openspec for cross-session + file backup

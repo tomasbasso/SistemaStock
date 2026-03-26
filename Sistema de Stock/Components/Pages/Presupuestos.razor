@@ -115,30 +115,35 @@
 
 <!-- Modal Nuevo Presupuesto -->
 <AppModal IsOpen="isModalOpen" IsOpenChanged="(v) => isModalOpen = v" Title="Nuevo Presupuesto">
+    <EditForm Model="nuevoPresupuesto" OnValidSubmit="GuardarYDescargarAsync">
+        <DataAnnotationsValidator />
 
-    <!-- Datos generales -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">Cliente <span class="text-gray-600">(Opcional)</span></label>
-            <select @bind="nuevoClienteId" class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]">
-                <option value="">— Sin cliente —</option>
-                @foreach (var c in clientes)
-                {
-                    <option value="@c.Id">@c.Name</option>
-                }
-            </select>
+        <!-- Datos generales -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Cliente <span class="text-gray-600">(Opcional)</span></label>
+                <InputSelect @bind-Value="nuevoPresupuesto.ClienteId" class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]">
+                    <option value="">— Sin cliente —</option>
+                    @foreach (var c in clientes)
+                    {
+                        <option value="@c.Id">@c.Name</option>
+                    }
+                </InputSelect>
+                <ValidationMessage For="() => nuevoPresupuesto.ClienteId" class="text-[var(--color-danger)] text-xs mt-1" />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Válido hasta <span class="text-gray-600">(Opcional)</span></label>
+                <InputDate @bind-Value="nuevoPresupuesto.FechaVencimiento"
+                           class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]" />
+                <ValidationMessage For="() => nuevoPresupuesto.FechaVencimiento" class="text-[var(--color-danger)] text-xs mt-1" />
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-400 mb-1.5">Observaciones <span class="text-gray-600">(Opcional)</span></label>
+                <InputText @bind-Value="nuevoPresupuesto.Notas" placeholder="Ej: No incluye IVA, incluye colocación..."
+                           class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]" />
+                <ValidationMessage For="() => nuevoPresupuesto.Notas" class="text-[var(--color-danger)] text-xs mt-1" />
+            </div>
         </div>
-        <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">Válido hasta <span class="text-gray-600">(Opcional)</span></label>
-            <input type="date" @bind="nuevaFechaVencimiento"
-                   class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]" />
-        </div>
-        <div>
-            <label class="block text-xs font-medium text-gray-400 mb-1.5">Observaciones <span class="text-gray-600">(Opcional)</span></label>
-            <input type="text" @bind="nuevasNotas" placeholder="Ej: No incluye IVA, incluye colocación..."
-                   class="w-full bg-black/20 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]" />
-        </div>
-    </div>
 
     <!-- Separador -->
     <div class="border-t border-white/10 mb-5"></div>
@@ -222,7 +227,7 @@
 
     <div class="mt-6 pt-5 border-t border-white/10 flex justify-end gap-3">
         <button type="button" @onclick="() => isModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
-        <button type="button" @onclick="GuardarYDescargarAsync"
+        <button type="submit"
                 disabled="@(!items.Any() || isSaving)"
                 class="px-6 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             @if (isSaving)
@@ -237,6 +242,7 @@
             }
         </button>
     </div>
+    </EditForm>
 </AppModal>
 
 <!-- Modal Eliminar -->
@@ -261,9 +267,7 @@
     private bool isModalOpen = false;
     private bool isSaving = false;
     private string productSearch = "";
-    private string nuevoClienteId = "";
-    private DateTime? nuevaFechaVencimiento = null;
-    private string nuevasNotas = "";
+    private Presupuesto nuevoPresupuesto = new();
 
     private class ItemPresupuesto
     {
@@ -312,9 +316,7 @@
     {
         items.Clear();
         productSearch = "";
-        nuevoClienteId = "";
-        nuevaFechaVencimiento = null;
-        nuevasNotas = "";
+        nuevoPresupuesto = new Presupuesto { Notas = "" };
         isModalOpen = true;
     }
 
@@ -340,13 +342,6 @@
         isSaving = true;
         try
         {
-            var presupuesto = new Presupuesto
-            {
-                ClienteId = Guid.TryParse(nuevoClienteId, out var cid) ? cid : null,
-                FechaVencimiento = nuevaFechaVencimiento,
-                Notas = nuevasNotas
-            };
-
             var detalles = items.Select(i => new PresupuestoDetalle
             {
                 ProductoId = i.ProductoId,
@@ -354,7 +349,7 @@
                 UnitPrice = i.PrecioUnitario
             }).ToList();
 
-            var saved = await Data.SavePresupuestoAsync(presupuesto, detalles);
+            var saved = await Data.SavePresupuestoAsync(nuevoPresupuesto, detalles);
 
             await GenerarYGuardarPdfAsync(saved, detalles);
 

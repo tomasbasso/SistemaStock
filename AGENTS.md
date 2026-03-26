@@ -122,3 +122,41 @@ Do not create a `tailwind.config.js`; all configuration belongs in `app.css` und
 - Dialog and file picker calls (FileSaver, FilePicker) must run on the main thread via `MainThread.InvokeOnMainThreadAsync(...)`.
 - `StockDbContext` is registered as `Transient`. Do not inject it as a singleton or hold long-lived references.
 - The database path is `FileSystem.AppDataDirectory/stock.db` on the target device — never use a hardcoded path.
+
+## Spec-Driven Development (SDD)
+
+This project uses [Agent Teams Lite](https://github.com/Gentleman-Programming/agent-teams-lite) for structured feature development with persistent memory.
+
+### Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `/sdd-init` | Initialize SDD context for this project |
+| `/sdd-explore <topic>` | Investigate an idea (no files created) |
+| `/sdd-new <name>` | Start a new feature (explore + propose) |
+| `/sdd-continue` | Run next phase of current change |
+| `/sdd-ff <name>` | Fast-forward planning (propose → spec → design → tasks) |
+| `/sdd-apply` | Implement tasks in batches |
+| `/sdd-verify` | Validate implementation against specs |
+| `/sdd-archive` | Close change and persist final state |
+
+### Persistence
+
+- **Mode**: `hybrid` (engram + openspec)
+- **Session memory**: Stored in Engram (cross-session recovery)
+- **File artifacts**: Stored in `openspec/` directory
+- **Skill registry**: Custom project skills in `.agents/skills/`
+
+### SDD Workflow
+
+```
+explore → propose → spec + design → tasks → apply → verify → archive
+```
+
+For substantial features, use SDD to maintain structured context across sessions. The orchestrator delegates work to specialized sub-agents, keeping the main conversation thread lightweight.
+
+### Quick Start
+
+1. Run `/sdd-init` to bootstrap the project context
+2. Run `/sdd-new <feature-name>` to start a new feature
+3. The orchestrator will guide you through the phases
