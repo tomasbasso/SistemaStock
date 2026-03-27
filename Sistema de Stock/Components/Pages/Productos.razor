@@ -5,24 +5,28 @@
 @inject DataService Data
 @inject NotificationService Notifications
 
-<div class="max-w-7xl mx-auto">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
     
     <!-- Header -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
+    <div class="flex flex-col lg:flex-row lg:items-end justify-between mb-8 gap-4">
         <div>
             <h2 class="page-title mb-1">Inventario</h2>
             <p class="page-subtitle">Gestión de Productos y Stock</p>
         </div>
-        <div class="flex gap-3">
+        <div class="flex flex-wrap items-center justify-start lg:justify-end gap-3">
             <button @onclick="OpenImportarExcel" class="bg-white/10 hover:bg-white/15 text-white font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
                 <i class="bi bi-file-earmark-excel-fill text-[var(--color-success)]"></i>
                 <span class="hidden md:inline">Importar Excel</span>
+            </button>
+            <button @onclick="OpenDeleteMultiple" class="bg-white/10 hover:bg-white/15 text-[var(--color-danger)] font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
+                <i class="bi bi-trash"></i>
+                <span class="hidden md:inline">Eliminar Varios</span>
             </button>
             <button @onclick="OpenAjustePrecios" class="bg-white/10 hover:bg-white/15 text-white font-medium py-3 px-5 rounded-xl transition-all flex items-center justify-center gap-2">
                 <i class="bi bi-percent"></i>
                 <span class="hidden md:inline">Ajustar Precios</span>
             </button>
-            <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2">
+            <button @onclick="OpenNew" class="bg-[var(--color-primary)] hover:brightness-110 text-white font-medium py-3 px-6 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 whitespace-nowrap">
                 <i class="bi bi-plus-lg"></i>
                 <span>Nuevo Producto</span>
             </button>
@@ -233,6 +237,90 @@
     </div>
 </AppModal>
 
+<!-- Eliminar Múltiples Modal -->
+<AppModal IsOpen="isDeleteMultipleModalOpen" IsOpenChanged="(v) => { isDeleteMultipleModalOpen = v; }" Title="Eliminar Productos Múltiples">
+    <div class="space-y-4">
+
+        <!-- Filtro por categoría -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Filtrar por Categoría</label>
+            <select @onchange="OnDeleteMultipleCategoriaChange" class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]">
+                <option value="">— Todas las categorías —</option>
+                @foreach (var c in categorias)
+                {
+                    <option value="@c.Id">@c.Name</option>
+                }
+            </select>
+        </div>
+
+        <!-- Búsqueda por nombre -->
+        <div>
+            <label class="block text-sm font-medium text-gray-300 mb-1">Buscar Producto</label>
+            <div class="relative">
+                <i class="bi bi-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                <input type="text" @bind="deleteMultipleBusqueda" @bind:event="oninput"
+                       placeholder="Buscar por nombre o SKU..."
+                       class="w-full bg-black/20 border border-white/10 rounded-xl pl-10 pr-9 py-2 text-white text-sm focus:outline-none focus:border-[var(--color-primary)] transition-all" />
+                @if (!string.IsNullOrEmpty(deleteMultipleBusqueda))
+                {
+                    <button type="button" @onclick="() => deleteMultipleBusqueda = string.Empty"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors">
+                        <i class="bi bi-x-circle-fill text-sm"></i>
+                    </button>
+                }
+            </div>
+        </div>
+
+        <!-- Lista de productos seleccionables -->
+        <div>
+            <div class="flex items-center justify-between mb-2">
+                <label class="text-sm font-medium text-gray-300">Productos (@deleteMultipleProductosFiltrados.Count(p => deleteMultipleSeleccionados.Contains(p.Id)) seleccionados de @deleteMultipleProductosFiltrados.Count)</label>
+                <div class="flex gap-2 text-xs">
+                    <button type="button" @onclick="SeleccionarTodosDeleteMultiple" class="text-[var(--color-primary)] hover:underline">Seleccionar todos</button>
+                    <span class="text-gray-600">|</span>
+                    <button type="button" @onclick="() => deleteMultipleSeleccionados.Clear()" class="text-gray-400 hover:underline">Limpiar</button>
+                </div>
+            </div>
+            <div class="max-h-64 overflow-y-auto space-y-1 pr-1 custom-scrollbar">
+                @foreach (var p in deleteMultipleProductosFiltrados)
+                {
+                    bool selected = deleteMultipleSeleccionados.Contains(p.Id);
+                    <div @onclick="() => ToggleDeleteMultipleProducto(p.Id)"
+                         class="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-all @(selected ? "bg-[var(--color-danger)]/15 border border-[var(--color-danger)]/30" : "bg-white/5 border border-transparent hover:bg-white/8")">
+                        <div class="w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all @(selected ? "bg-[var(--color-danger)] border-[var(--color-danger)]" : "border-gray-500")">
+                            @if (selected) { <i class="bi bi-check text-white" style="font-size:10px"></i> }
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <span class="text-sm text-white truncate block">@p.Name</span>
+                            <span class="text-xs text-gray-500">@GetCategoryName(p.CategoryId)</span>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <span class="text-sm text-gray-400 font-medium">Stock: @p.Stock</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Resumen -->
+        @if (deleteMultipleSeleccionados.Count > 0)
+        {
+            <div class="bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 rounded-xl p-3">
+                <p class="text-sm text-[var(--color-danger)]"><i class="bi bi-exclamation-triangle-fill mr-1"></i> Se eliminarán <strong>@deleteMultipleSeleccionados.Count producto(s)</strong> de forma permanente.</p>
+            </div>
+        }
+    </div>
+
+    <div class="mt-6 flex justify-end gap-3">
+        <button type="button" @onclick="() => isDeleteMultipleModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
+        <button type="button" @onclick="AplicarDeleteMultiple" disabled="@(deleteMultipleSeleccionados.Count == 0 || isApplyingDeleteMultiple)"
+                class="px-5 py-2.5 rounded-xl bg-[var(--color-danger)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+            @if (isApplyingDeleteMultiple) { <i class="bi bi-arrow-repeat animate-spin"></i> }
+            Eliminar Seleccionados
+        </button>
+    </div>
+</AppModal>
+
 <!-- Ajuste de Precios Modal -->
 <AppModal IsOpen="isAjusteModalOpen" IsOpenChanged="(v) => { isAjusteModalOpen = v; }" Title="Ajuste de Precios por Porcentaje">
     <div class="space-y-4">
@@ -281,7 +369,7 @@
                     }
                 </div>
                 <div class="relative flex-1">
-                    <input type="number" step="0.1" min="0.1" max="500" @bind="ajustePorcentaje"
+                    <input type="number" step="0.1" min="-100" max="500" @bind="ajustePorcentaje"
                            class="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]" placeholder="Personalizado" />
                     <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">%</span>
                 </div>
@@ -313,9 +401,9 @@
                         </div>
                         <div class="text-right flex-shrink-0">
                             <span class="text-sm text-[var(--color-secondary)] font-medium">@p.Price.ToString("C")</span>
-                            @if (selected && ajustePorcentaje > 0)
+                            @if (selected && ajustePorcentaje != 0)
                             {
-                                <span class="text-xs text-green-400 block">→ @(Math.Round(p.Price * (1 + ajustePorcentaje / 100), 2).ToString("C"))</span>
+                                <span class="text-xs @(ajustePorcentaje > 0 ? "text-green-400" : "text-red-400") block">→ @(Math.Max(0, Math.Round(p.Price * (1 + ajustePorcentaje / 100), 2)).ToString("C"))</span>
                             }
                         </div>
                     </div>
@@ -324,17 +412,17 @@
         </div>
 
         <!-- Resumen -->
-        @if (ajusteSeleccionados.Count > 0 && ajustePorcentaje > 0)
+        @if (ajusteSeleccionados.Count > 0 && ajustePorcentaje != 0)
         {
             <div class="bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 rounded-xl p-3">
-                <p class="text-sm text-white">Se aumentará el precio de <strong>@ajusteSeleccionados.Count producto(s)</strong> un <strong>@ajustePorcentaje%</strong>.</p>
+                <p class="text-sm text-white">Se @(ajustePorcentaje > 0 ? "aumentará" : "reducirá") el precio de <strong>@ajusteSeleccionados.Count producto(s)</strong> un <strong>@Math.Abs(ajustePorcentaje)%</strong>.</p>
             </div>
         }
     </div>
 
     <div class="mt-6 flex justify-end gap-3">
         <button type="button" @onclick="() => isAjusteModalOpen = false" class="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors font-medium">Cancelar</button>
-        <button type="button" @onclick="AplicarAjustePrecios" disabled="@(ajusteSeleccionados.Count == 0 || ajustePorcentaje <= 0 || isApplyingAjuste)"
+        <button type="button" @onclick="AplicarAjustePrecios" disabled="@(ajusteSeleccionados.Count == 0 || ajustePorcentaje == 0 || isApplyingAjuste)"
                 class="px-5 py-2.5 rounded-xl bg-[var(--color-primary)] hover:brightness-110 text-white transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
             @if (isApplyingAjuste) { <i class="bi bi-arrow-repeat animate-spin"></i> }
             Aplicar Aumento
@@ -510,6 +598,20 @@
         .Where(p => string.IsNullOrWhiteSpace(ajusteBusqueda) ||
                     p.Name.Contains(ajusteBusqueda, StringComparison.OrdinalIgnoreCase) ||
                     (p.SKU != null && p.SKU.Contains(ajusteBusqueda, StringComparison.OrdinalIgnoreCase)))
+        .OrderBy(p => GetCategoryName(p.CategoryId)).ThenBy(p => p.Name)
+        .ToList();
+
+    // Eliminar Múltiples
+    private bool isDeleteMultipleModalOpen = false;
+    private bool isApplyingDeleteMultiple = false;
+    private Guid deleteMultipleCategoriaFiltro = Guid.Empty;
+    private string deleteMultipleBusqueda = "";
+    private HashSet<Guid> deleteMultipleSeleccionados = new();
+    private List<Producto> deleteMultipleProductosFiltrados => todosLosProductos
+        .Where(p => deleteMultipleCategoriaFiltro == Guid.Empty || p.CategoryId == deleteMultipleCategoriaFiltro)
+        .Where(p => string.IsNullOrWhiteSpace(deleteMultipleBusqueda) ||
+                    p.Name.Contains(deleteMultipleBusqueda, StringComparison.OrdinalIgnoreCase) ||
+                    (p.SKU != null && p.SKU.Contains(deleteMultipleBusqueda, StringComparison.OrdinalIgnoreCase)))
         .OrderBy(p => GetCategoryName(p.CategoryId)).ThenBy(p => p.Name)
         .ToList();
 
@@ -717,12 +819,12 @@
 
     private async Task AplicarAjustePrecios()
     {
-        if (ajusteSeleccionados.Count == 0 || ajustePorcentaje <= 0) return;
+        if (ajusteSeleccionados.Count == 0 || ajustePorcentaje == 0) return;
         isApplyingAjuste = true;
         try
         {
             await Data.AjustarPreciosPorcentajeAsync(ajusteSeleccionados.ToList(), ajustePorcentaje);
-            Notifications.Success($"Se actualizaron {ajusteSeleccionados.Count} producto(s) con un aumento del {ajustePorcentaje}%.");
+            Notifications.Success($"Se actualizaron {ajusteSeleccionados.Count} producto(s) con un ajuste del {ajustePorcentaje}%.");
             isAjusteModalOpen = false;
             await LoadData();
         }
@@ -733,6 +835,58 @@
         finally
         {
             isApplyingAjuste = false;
+        }
+    }
+
+    // ── Eliminar Múltiples ───────────────────────────────────────
+    private async Task OpenDeleteMultiple()
+    {
+        todosLosProductos = await Data.GetProductosAsync();
+        deleteMultipleSeleccionados.Clear();
+        deleteMultipleCategoriaFiltro = Guid.Empty;
+        deleteMultipleBusqueda = "";
+        isDeleteMultipleModalOpen = true;
+    }
+
+    private void OnDeleteMultipleCategoriaChange(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+            deleteMultipleCategoriaFiltro = id;
+        else
+            deleteMultipleCategoriaFiltro = Guid.Empty;
+        
+        deleteMultipleSeleccionados = deleteMultipleProductosFiltrados.Select(p => p.Id).ToHashSet();
+    }
+
+    private void ToggleDeleteMultipleProducto(Guid id)
+    {
+        if (!deleteMultipleSeleccionados.Remove(id))
+            deleteMultipleSeleccionados.Add(id);
+    }
+
+    private void SeleccionarTodosDeleteMultiple()
+    {
+        deleteMultipleSeleccionados = deleteMultipleProductosFiltrados.Select(p => p.Id).ToHashSet();
+    }
+
+    private async Task AplicarDeleteMultiple()
+    {
+        if (deleteMultipleSeleccionados.Count == 0) return;
+        isApplyingDeleteMultiple = true;
+        try
+        {
+            await Data.DeleteProductosAsync(deleteMultipleSeleccionados.ToList());
+            Notifications.Success($"Se eliminaron {deleteMultipleSeleccionados.Count} producto(s) correctamente.");
+            isDeleteMultipleModalOpen = false;
+            await LoadData();
+        }
+        catch (Exception ex)
+        {
+            Notifications.Error($"Error al eliminar productos: {ex.Message}");
+        }
+        finally
+        {
+            isApplyingDeleteMultiple = false;
         }
     }
 

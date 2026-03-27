@@ -173,7 +173,7 @@ namespace Sistema_de_Stock.Services
             foreach (var p in productos)
             {
                 var precioAnterior = p.Price;
-                p.Price = Math.Round(p.Price * (1 + porcentaje / 100), 2);
+                p.Price = Math.Max(0, Math.Round(p.Price * (1 + porcentaje / 100), 2));
                 RegistrarHistorialPrecio(p, precioAnterior, p.Price);
             }
             await _db.SaveChangesAsync();
@@ -314,6 +314,19 @@ namespace Sistema_de_Stock.Services
             if (entity != null)
             {
                 entity.IsDeleted = true;
+                await _db.SaveChangesAsync();
+            }
+        }
+
+        public async Task DeleteProductosAsync(List<Guid> ids)
+        {
+            var entities = await _db.Productos.IgnoreQueryFilters().Where(p => ids.Contains(p.Id)).ToListAsync();
+            foreach (var entity in entities)
+            {
+                entity.IsDeleted = true;
+            }
+            if (entities.Any())
+            {
                 await _db.SaveChangesAsync();
             }
         }
